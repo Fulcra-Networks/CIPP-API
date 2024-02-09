@@ -7,4 +7,5 @@
     'Az.accounts'   = '2.*'
     'Az.Keyvault'   = '3.*'
     'AzBobbyTables' = '2.*'
+    'AutoTaskAPI'   = '1.*'
 }

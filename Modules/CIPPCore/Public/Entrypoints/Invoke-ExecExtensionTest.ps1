@@ -35,6 +35,10 @@ try {
                   $token = Get-NinjaOneToken -configuration $Configuration.NinjaOne
                   $Results = [pscustomobject]@{"Results" = "Succesfully Connected to NinjaOne" }
             }
+            "IronScales" {
+                  $token = Get-IronScalesToken -configuration $Configuration.IronScales
+                  $Results = [pscustomobject]@{"Results" = "Succesfully Connected to IronScales" }
+            }
       }
 }
 catch {
