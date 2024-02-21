@@ -2,15 +2,9 @@
   "bindings": [
     {
       "name": "Timer",
-      "schedule": "0 */30 * * * *",
+      "schedule": "0 */5 * * * *",
       "direction": "in",
       "type": "timerTrigger"
-    },
-    {
-      "name": "QueueItem",
-      "type": "queueTrigger",
-      "direction": "in",
-      "queueName": "phishingqueue"
     }
   ]
 }
