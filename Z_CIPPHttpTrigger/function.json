@@ -66,6 +66,12 @@
     {
       "type": "queue",
       "direction": "out",
+      "name": "ironscalesqueue",
+      "queueName": "phishingqueue"
+    },
+    {
+      "type": "queue",
+      "direction": "out",
       "name": "NinjaProcess",
       "queueName": "NinjaOneQueue"
     },

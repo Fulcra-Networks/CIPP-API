@@ -75,10 +75,12 @@ Function Invoke-ExecExtensionSync {
         Write-LogMessage -API 'IronScales' -tenant 'none' -message 'Force Sync Requested for IronScales' -sev Info
         $Configuration = (Get-CIPPAzDataTableEntity @Table).config | ConvertFrom-Json -Depth 10
         if(!$Configuration.IronScales.enabled) {
-            return
+            $Results = [PSCustomObject]@{'Results' = 'IronScales is not enabled.'}
+        }            
+        else {
+            Push-OutputBinding -Name ironscalesqueue -Value 'LetsGo'
+            $Results = [pscustomobject]@{'Results' = 'Succesfully started IronScales Sync' }
         }
-            
-        Get-IronScalesIncidents -configuration $Configuration.IronScales
     }
 
     Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{

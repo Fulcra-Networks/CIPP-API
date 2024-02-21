@@ -2,6 +2,7 @@
 function New-AutotaskTicket {
     param($atCompany, $title, $description, $estHr = 0.1)
 
+    try{
     $ticket = New-AutotaskBody -Resource Tickets -NoContent
     $ticket.Id                      = "0"                   #Always 0 for a new ticket
     $ticket.ticketType              = "1"
@@ -20,6 +21,10 @@ function New-AutotaskTicket {
     $ticket.estimatedHours          = $estHr
 
     New-AutotaskAPIResource -Resource Tickets -Body $ticket
+    }
+    catch {
+        Write-LogMessage -API 'Autotask' -tenant 'none' -message "Error creating ticket. $($_.Exception.Message)" -Sev Info
+    }
 }
 
 <# TICKET STATUS:
