@@ -13,7 +13,7 @@ function New-IronScalestickets {
     param($IronScalesIncidents)
 
     if($IronScalesIncidents.length -eq 0){
-        Write-LogMessage -API "IronScales_Tickets" -tenant "none" -message "No incidents received." -sev Debug
+        Write-LogMessage -API "IronScales" -tenant "none" -message "No incidents received." -sev Info
         return 
     } 
 
@@ -142,7 +142,8 @@ function Get-IronScalesIncidents {
         }
     }
 
-    Write-Host "Got $($all_unclassified.Length) companies with unclassified incidents."
+    Write-LogMessage -API "IronScales_Tickets" -tenant "none" -message "Got $($all_unclassified.Length) companies with unclassified incidents." -sev Info
+    
     
     New-IronScalestickets $all_unclassified
 }

@@ -10,7 +10,6 @@ try {
         return
     }
         
-    Write-Host "Getting IronScales Incidents"
     Get-IronScalesIncidents -configuration $Configuration.IronScales
 }
 catch {

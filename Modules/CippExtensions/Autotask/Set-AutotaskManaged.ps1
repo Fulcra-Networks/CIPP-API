@@ -9,10 +9,9 @@ function Set-AutotaskManaged {
     
     $Table = Get-CippTable -tablename 'CippMapping'
 
-    Write-LogMessage -API $APINAME -user $request.headers.'x-ms-client-principal' -message $(ConvertTo-Json $Request.body -Depth 10) -Sev 'Info'
+    Write-LogMessage -API $APINAME -user $request.headers.'x-ms-client-principal' -message $(ConvertTo-Json $Request.body -Depth 10) -Sev Debug
 
     foreach ($Mapping in ([pscustomobject]$Request.body).psobject.properties) {        
-        Write-LogMessage -API $APINAME -user $request.headers.'x-ms-client-principal' -message $(ConvertTo-Json $Mapping -Depth 10) -Sev 'Info'
         $Filter = "PartitionKey eq 'Mapping' and AutotaskPSAName eq '$($mapping.name)'"
         $res = Get-CIPPAzDataTableEntity @CIPPMapping -Filter $Filter
 

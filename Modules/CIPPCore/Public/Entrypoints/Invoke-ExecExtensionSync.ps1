@@ -71,6 +71,15 @@ Function Invoke-ExecExtensionSync {
 
     }
 
+    if ($Request.Query.Extension -eq 'IronScales') {
+        Write-LogMessage -API 'IronScales' -tenant 'none' -message 'Force Sync Requested for IronScales' -sev Info
+        $Configuration = (Get-CIPPAzDataTableEntity @Table).config | ConvertFrom-Json -Depth 10
+        if(!$Configuration.IronScales.enabled) {
+            return
+        }
+            
+        Get-IronScalesIncidents -configuration $Configuration.IronScales
+    }
 
     Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
             StatusCode = [HttpStatusCode]::OK
