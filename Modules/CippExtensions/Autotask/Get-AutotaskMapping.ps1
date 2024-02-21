@@ -37,7 +37,7 @@ function Get-AutotaskMapping {
         }
     }
     
-    Get-Tenants -IncludeAll
+    $Tenants = Get-Tenants -IncludeAll
     $MappingObj = [PSCustomObject]@{
         Tenants           = @($Tenants)
         AutotaskCustomers = @($AutotaskCustomers)
