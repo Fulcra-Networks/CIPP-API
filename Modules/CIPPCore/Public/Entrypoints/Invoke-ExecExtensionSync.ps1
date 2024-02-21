@@ -73,6 +73,7 @@ Function Invoke-ExecExtensionSync {
 
     if ($Request.Query.Extension -eq 'IronScales') {
         Write-LogMessage -API 'IronScales' -tenant 'none' -message 'Force Sync Requested for IronScales' -sev Info
+        $Table = Get-CIPPTable -TableName Extensionsconfig
         $Configuration = (Get-CIPPAzDataTableEntity @Table).config | ConvertFrom-Json -Depth 10
         if(!$Configuration.IronScales.enabled) {
             $Results = [PSCustomObject]@{'Results' = 'IronScales is not enabled.'}
