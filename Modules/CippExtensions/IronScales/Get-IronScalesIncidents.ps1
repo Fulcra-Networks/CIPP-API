@@ -128,21 +128,25 @@ function Get-IronScalesIncidents {
 
     $all_unclassified = @()
     foreach($company in $SCRIPT:Companies){
-        #Write-Host "Getting unclassified incidents for $($company.name):$($company.Id)"
-        $incidents = Get-Incidents $company.Id
-        #Write-Host "Got $($incidents.Length) for $($company.name)"
+        try{
+            Write-LogMessage -API "IronScales" -tenant "none" -message "Getting unclassified incidents for $($company.name):$($company.Id)" -sev Info
+            $incidents = Get-Incidents $company.Id
 
-        if($incidents.Length -gt 0){
-            $companyIncidents = [PSCustomObject]@{
-                CustomerName = $company.name
-                Incidents = $incidents
+            if($incidents.Length -gt 0){
+                $companyIncidents = [PSCustomObject]@{
+                    CustomerName = $company.name
+                    Incidents = $incidents
+                }
+
+                $all_unclassified += $companyIncidents
             }
-
-            $all_unclassified += $companyIncidents
+        }
+        catch {
+            Write-LogMessage -API "IronScales" -tenant "none" -message "Error getting IronScales incidents: $($_.Exception.Message)" -sev Error
         }
     }
 
-    Write-LogMessage -API "IronScales_Tickets" -tenant "none" -message "Got $($all_unclassified.Length) companies with unclassified incidents." -sev Info
+    Write-LogMessage -API "IronScales" -tenant "none" -message "Got $($all_unclassified.Length) companies with unclassified incidents." -sev Info
     
     
     New-IronScalestickets $all_unclassified

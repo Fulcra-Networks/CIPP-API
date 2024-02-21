@@ -2,7 +2,7 @@
 param($Timer)
 
 try {
-    Write-LogMessage -API "IronScales_Tickets" -tenant "none" -message "Starting IronScales processing." -sev Info
+    Write-LogMessage -API "Scheduler_IronScales" -tenant "none" -message "Starting IronScales processing." -sev Info
 
     $Table = Get-CIPPTable -TableName Extensionsconfig
     $Configuration = (Get-CIPPAzDataTableEntity @Table).config | ConvertFrom-Json -Depth 10
