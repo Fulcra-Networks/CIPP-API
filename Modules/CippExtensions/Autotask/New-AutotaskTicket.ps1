@@ -1,26 +1,28 @@
 #Hints on int values below
 function New-AutotaskTicket {
     param($atCompany, $title, $description, $estHr = 0.1)
-
+    
     try{
-    $ticket = New-AutotaskBody -Resource Tickets -NoContent
-    $ticket.Id                      = "0"                   #Always 0 for a new ticket
-    $ticket.ticketType              = "1"
-    $ticket.companyId               = "$($atCompany.id)"
-    $ticket.priority                = "2"
-    $ticket.ticketCategory          = "3"
-    $ticket.ticketType              = "5"
-    $ticket.serviceLevelAgreementID = "1"
-    $ticket.issueType               = "29"
-    $ticket.subIssueType            = "323"
-    $ticket.title                   = $title
-    $ticket.description             = $description
-    $ticket.source                  = "8"
-    $ticket.status                  = "1"
-    $ticket.queueID                 = "29682833"
-    $ticket.estimatedHours          = $estHr
+        Get-AutotaskToken -configuration $Configuration.Autotask
+        
+        $ticket = New-AutotaskBody -Resource Tickets -NoContent
+        $ticket.Id                      = "0"                   #Always 0 for a new ticket
+        $ticket.ticketType              = "1"
+        $ticket.companyId               = "$($atCompany.id)"
+        $ticket.priority                = "2"
+        $ticket.ticketCategory          = "3"
+        $ticket.ticketType              = "5"
+        $ticket.serviceLevelAgreementID = "1"
+        $ticket.issueType               = "29"
+        $ticket.subIssueType            = "323"
+        $ticket.title                   = $title
+        $ticket.description             = $description
+        $ticket.source                  = "8"
+        $ticket.status                  = "1"
+        $ticket.queueID                 = "29682833"
+        $ticket.estimatedHours          = $estHr
 
-    New-AutotaskAPIResource -Resource Tickets -Body $ticket
+        New-AutotaskAPIResource -Resource Tickets -Body $ticket
     }
     catch {
         Write-LogMessage -API 'Autotask' -tenant 'none' -message "Error creating ticket. $($_.Exception.Message)" -Sev Info
