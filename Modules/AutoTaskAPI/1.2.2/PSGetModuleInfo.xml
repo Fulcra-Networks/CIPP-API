@@ -1,0 +1,154 @@
+<Objs Version="1.1.0.1" xmlns="http://schemas.microsoft.com/powershell/2004/04">
+  <Obj RefId="0">
+    <TN RefId="0">
+      <T>Microsoft.PowerShell.Commands.PSRepositoryItemInfo</T>
+      <T>System.Management.Automation.PSCustomObject</T>
+      <T>System.Object</T>
+    </TN>
+    <MS>
+      <S N="Name">AutoTaskAPI</S>
+      <Version N="Version">1.2.2</Version>
+      <S N="Type">Module</S>
+      <S N="Description">This module allows you to connect to the Autotask REST API. The Autotask REST API was launched with version 2020.2</S>
+      <S N="Author">Kelvin Tegelaar - Kelvin@limenetworks.nl</S>
+      <S N="CompanyName">Lime-TeGek</S>
+      <S N="Copyright">(c) 2020 Kelvin Tegelaar - Kelvin@limenetworks.nl. All rights reserved.</S>
+      <DT N="PublishedDate">2022-10-16T10:43:21-06:00</DT>
+      <Obj N="InstalledDate" RefId="1">
+        <DT>2023-10-26T09:55:24.4812819-06:00</DT>
+        <MS>
+          <Obj N="DisplayHint" RefId="2">
+            <TN RefId="1">
+              <T>Microsoft.PowerShell.Commands.DisplayHintType</T>
+              <T>System.Enum</T>
+              <T>System.ValueType</T>
+              <T>System.Object</T>
+            </TN>
+            <ToString>DateTime</ToString>
+            <I32>2</I32>
+          </Obj>
+        </MS>
+      </Obj>
+      <Nil N="UpdatedDate" />
+      <URI N="LicenseUri">https://github.com/KelvinTegelaar/AutotaskAPI/blob/master/LICENSE</URI>
+      <URI N="ProjectUri">https://github.com/KelvinTegelaar/AutotaskAPI</URI>
+      <Nil N="IconUri" />
+      <Obj N="Tags" RefId="3">
+        <TN RefId="2">
+          <T>System.Object[]</T>
+          <T>System.Array</T>
+          <T>System.Object</T>
+        </TN>
+        <LST>
+          <S>Autotask</S>
+          <S>api</S>
+          <S>REST</S>
+          <S>AutotaskAPI</S>
+          <S>PSA</S>
+          <S>AutotaskPSA</S>
+          <S>Datto</S>
+          <S>CyberDrain</S>
+          <S>PSModule</S>
+        </LST>
+      </Obj>
+      <Obj N="Includes" RefId="4">
+        <TN RefId="3">
+          <T>System.Collections.Hashtable</T>
+          <T>System.Object</T>
+        </TN>
+        <DCT>
+          <En>
+            <S N="Key">Command</S>
+            <Obj N="Value" RefId="5">
+              <TNRef RefId="2" />
+              <LST>
+                <S>Add-AutotaskBaseURI</S>
+                <S>Add-AutotaskAPIAuth</S>
+                <S>Get-AutotaskAPIResource</S>
+                <S>New-AutotaskAPIResource</S>
+                <S>Set-AutotaskAPIResource</S>
+                <S>New-AutotaskBody</S>
+                <S>Remove-AutotaskAPIResource</S>
+              </LST>
+            </Obj>
+          </En>
+          <En>
+            <S N="Key">Workflow</S>
+            <Obj N="Value" RefId="6">
+              <TNRef RefId="2" />
+              <LST />
+            </Obj>
+          </En>
+          <En>
+            <S N="Key">RoleCapability</S>
+            <Ref N="Value" RefId="6" />
+          </En>
+          <En>
+            <S N="Key">DscResource</S>
+            <Ref N="Value" RefId="6" />
+          </En>
+          <En>
+            <S N="Key">Function</S>
+            <Obj N="Value" RefId="7">
+              <TNRef RefId="2" />
+              <LST>
+                <S>Add-AutotaskBaseURI</S>
+                <S>Add-AutotaskAPIAuth</S>
+                <S>Get-AutotaskAPIResource</S>
+                <S>New-AutotaskAPIResource</S>
+                <S>Set-AutotaskAPIResource</S>
+                <S>New-AutotaskBody</S>
+                <S>Remove-AutotaskAPIResource</S>
+              </LST>
+            </Obj>
+          </En>
+          <En>
+            <S N="Key">Cmdlet</S>
+            <Ref N="Value" RefId="6" />
+          </En>
+        </DCT>
+      </Obj>
+      <Nil N="PowerShellGetFormatVersion" />
+      <S N="ReleaseNotes">Version 1.0 allows you to get, set, and create new items on the Autotask/Datto PSA API. For more information, check out the Autotask information page here https://www.datto.com/integrations?query=powershell&amp;products=Autotask+PSA&amp;categories=Middleware+%26+Developers or the Github project. Version 1.0.1 had minor fixes for error handling. Version 1.0.2 removed some repeatable code.</S>
+      <Obj N="Dependencies" RefId="8">
+        <TNRef RefId="2" />
+        <LST />
+      </Obj>
+      <S N="RepositorySourceLocation">https://www.powershellgallery.com/api/v2</S>
+      <S N="Repository">PSGallery</S>
+      <S N="PackageManagementProvider">NuGet</S>
+      <Obj N="AdditionalMetadata" RefId="9">
+        <TN RefId="4">
+          <T>System.Management.Automation.PSCustomObject</T>
+          <T>System.Object</T>
+        </TN>
+        <MS>
+          <S N="copyright">(c) 2020 Kelvin Tegelaar - Kelvin@limenetworks.nl. All rights reserved.</S>
+          <S N="description">This module allows you to connect to the Autotask REST API. The Autotask REST API was launched with version 2020.2</S>
+          <S N="requireLicenseAcceptance">False</S>
+          <S N="releaseNotes">Version 1.0 allows you to get, set, and create new items on the Autotask/Datto PSA API. For more information, check out the Autotask information page here https://www.datto.com/integrations?query=powershell&amp;products=Autotask+PSA&amp;categories=Middleware+%26+Developers or the Github project. Version 1.0.1 had minor fixes for error handling. Version 1.0.2 removed some repeatable code.</S>
+          <S N="isLatestVersion">True</S>
+          <S N="isAbsoluteLatestVersion">True</S>
+          <S N="versionDownloadCount">363012</S>
+          <S N="downloadCount">398086</S>
+          <S N="packageSize">343418</S>
+          <S N="published">10/16/2022 10:43:21 AM -06:00</S>
+          <S N="created">10/16/2022 10:43:21 AM -06:00</S>
+          <S N="lastUpdated">10/21/2023 12:31:30 PM -06:00</S>
+          <S N="tags">Autotask api REST AutotaskAPI PSA AutotaskPSA Datto CyberDrain PSModule PSFunction_Add-AutotaskBaseURI PSCommand_Add-AutotaskBaseURI PSFunction_Add-AutotaskAPIAuth PSCommand_Add-AutotaskAPIAuth PSFunction_Get-AutotaskAPIResource PSCommand_Get-AutotaskAPIResource PSFunction_New-AutotaskAPIResource PSCommand_New-AutotaskAPIResource PSFunction_Set-AutotaskAPIResource PSCommand_Set-AutotaskAPIResource PSFunction_New-AutotaskBody PSCommand_New-AutotaskBody PSFunction_Remove-AutotaskAPIResource PSCommand_Remove-AutotaskAPIResource PSIncludes_Function</S>
+          <S N="developmentDependency">False</S>
+          <S N="updated">2023-10-21T12:31:30Z</S>
+          <S N="NormalizedVersion">1.2.2</S>
+          <S N="Authors">Kelvin Tegelaar - Kelvin@limenetworks.nl</S>
+          <S N="IsPrerelease">false</S>
+          <S N="ItemType">Module</S>
+          <S N="FileList">AutoTaskAPI.nuspec|.git\objects\b2\f86e2e7b2a612fa9e394c2007d35721d0c0066|.git\objects\bf\84938e22ea0fa3f790b1102d1ca7a2381ab5c8|.git\objects\cf\83004b4b37b8f96f890fa33a5f6da0a4909b18|.git\objects\f2\e28b178d77a6c65aadbcf0e92d8247d32e76cb|.git\refs\heads\master|.git\FETCH_HEAD|.git\FETCH_HEAD-DESKTOP-7UE47D8-2|.git\FETCH_HEAD-XPSK-10|.git\FETCH_HEAD-XPSK-8|Private\New-ResourceDynamicParameter.ps1|.git\hooks\applypatch-msg.sample|.git\hooks\pre-rebase.sample|.git\objects\07\f3757e8af5957d8ab7bf8eb1e07bf9e0236260|.git\objects\28\d39caf76ca4e06670768666873749b6d8ee1b0|.git\objects\39\a27c80622c4175fb84c385cd42a06faaf4669c|.git\objects\49\efea52f9ffaad2b27833e43abdf5344fae22c4|.git\objects\59\ededf6e3e145d2e4b5cd0c51cc23aa1b063a88|.git\objects\70\49328b9c8f2ba2de615e5de1cd41a9a3327727|.git\objects\8e\bcc61165f4ced0c8a25e9fec649c174f2455b0|.git\objects\b4\23ab12aebd886584e13f755c1a58cd57fcfd74|.git\objects\c1\600dc38274ee35f937bd82c70de7da54370462|.git\objects\d0\08b8cd344ee3ada6ae3edd406d20f72085a1e1|.git\objects\f6\75a53c3e3aef2b012a14f8a063947032be6861|.git\logs\refs\heads\master|AutoTaskAPI.psd1|.git\FETCH_HEAD-DESKTOP-7UE47D8|.git\FETCH_HEAD-DESKTOP-7UE47D8-3|.git\FETCH_HEAD-XPSK-11|.git\FETCH_HEAD-XPSK-9|Public\Add-AutotaskAPIAuth.ps1|.git\hooks\commit-msg.sample|.git\hooks\pre-receive.sample|.git\objects\0f\fc3f64180ce86d2e98db02b4ec20d524c12703|.git\objects\2c\5d6af1b3465e51b1b3aeb07b20fbef9477da43|.git\objects\3b\3c89d36769896171f2979a609a48abfe39ef96|.git\objects\4b\a68be7514f7d6850a6d06743bbb5e328e4c441|.git\objects\5a\4a4592c7bb38dc4d17512e14cd4d8c595a1f1d|.git\objects\73\5d5ff8caf34bdb81c888fbdbce23f24274277d|.git\objects\94\32068b3f527735ca047712bce4fda952b6c01f|.git\objects\b5\bffe78e968378745a183bd174b3b700e4643b9|.git\objects\c5\41b91d3af2f7430bfd39d60495ba4745337732|.git\objects\d0\a9c16f49ccf1471c615ab8f4a73413188ce300|.git\objects\f6\cfb2d29cef38f962c7d1d8bf6d4c9891a96006|.git\refs\remotes\origin\beta|AutotaskAPI.psm1|.git\FETCH_HEAD-DESKTOP-7UE47D8-10|.git\FETCH_HEAD-DESKTOP-7UE47D8-4|.git\FETCH_HEAD-XPSK-12|.git\HEAD|Public\Add-AutotaskBaseURI.ps1|.git\hooks\fsmonitor-watchman.sample|.git\hooks\prepare-commit-msg.sample|.git\objects\15\7fa526582d693eeb0a322687f7d8c715cfb994|.git\objects\2c\5ff5e04bbc5f5b56758d8d7472ff05ff48ac60|.git\objects\3c\6383151acc47a815a609fbc1e3a7eaccf23051|.git\objects\4c\7b52e9621f8592fb83a5362a8df420e18c7c8c|.git\objects\5c\9caa2d266764dde504faceff52c942b3f9fb09|.git\objects\73\c632ca04c2fa0e9958a2c5edd4de302a9d5240|.git\objects\99\1f6a931944f48b47a2611a72fd77081a4610aa|.git\objects\b5\e678687809b1631ab1fe5a7a818fbbd6d037a9|.git\objects\c5\87e0b8cd89d4d632ae8b416eecc0e91af6197e|.git\objects\d5\c4a6870b3ba4e9816dffe065ea955e8821345c|.git\objects\f7\1cd877f8889a455aba17587205222442b31148|.git\refs\remotes\origin\HEAD|LICENSE|.git\FETCH_HEAD-DESKTOP-7UE47D8-11|.git\FETCH_HEAD-DESKTOP-7UE47D8-5|.git\FETCH_HEAD-XPSK-2|.git\index|Public\Get-AutotaskAPIResource.ps1|.git\hooks\post-update.sample|.git\hooks\update.sample|.git\objects\17\e667e0bf1c9cb4f643b5311b4cf80de62ee108|.git\objects\2f\4e344eda30614dbbd469bc4bdf93dae2708657|.git\objects\3e\ca769178ea45e3a4c4bb0c8b014db21411ea8e|.git\objects\4d\6eba32c2800c155eb44c4ad1f1006a5526cc0f|.git\objects\5e\bc6b37652dbdaa4eb42d6d07bad1dd322d288b|.git\objects\75\61dce0d62916926d62f0ad2687578f34f22874|.git\objects\99\3f8b77e2866f7f84784cdb26cc4a69babb739f|.git\objects\b6\46a1f859b3c4a2c81506f08e415a7549ed486e|.git\objects\c6\0269c10758af5bf793234242ed294dc17268bc|.git\objects\e0\377aed094963bdbdcc8d0960824280328feeea|.git\objects\f7\dfee24a3961365161b2d5129ed67cd8ac10a45|.git\refs\remotes\origin\master|README.md|.git\FETCH_HEAD-DESKTOP-7UE47D8-12|.git\FETCH_HEAD-DESKTOP-7UE47D8-6|.git\FETCH_HEAD-XPSK-3|.git\ORIG_HEAD|Public\New-AutotaskAPIResource.ps1|.git\hooks\pre-applypatch.sample|.git\info\exclude|.git\objects\18\782f3cdcf10287983c5c34b56a0e06f0bb0e40|.git\objects\2f\fe7dd7a5052333cd0cdd3863f60edf10488f06|.git\objects\46\6004df136a57aa21fbed5da20428d2b66c8aaf|.git\objects\4f\fc067fabc37299b736c7eaa935ecd46ae3a340|.git\objects\64\47331ee15d3ec0d4bdbb008bd807cdbcfd9679|.git\objects\76\8ce215cd82ca65de1ed70755f51ecafa49ee5e|.git\objects\9a\ad9acd30db6a781028919076b2cac1ed3b8e29|.git\objects\b6\c0829c7cf8cd5e221663e6bb61aae999f5f7f2|.git\objects\c6\763d8d21aa1db9b85925be8731b6d858d6ca8a|.git\objects\e3\e34c752618332ab3e0b9d56e3e36b70e9e9e54|.git\objects\f9\d712574046809c404fa4b908b1b27016c2a181|.git\logs\refs\remotes\origin\beta|v1.json|.git\FETCH_HEAD-DESKTOP-7UE47D8-13|.git\FETCH_HEAD-DESKTOP-7UE47D8-7|.git\FETCH_HEAD-XPSK-4|.git\packed-refs|Public\New-AutotaskBody.ps1|.git\hooks\pre-commit.sample|.git\logs\HEAD|.git\objects\18\a01b0bf964cf0dd3b0882d8f0b60acea70bb6f|.git\objects\35\11610a77a6e6e337d25bb696331081daac6208|.git\objects\48\2fe7c5a21a93d1567f1047f9c5c4d05808ff96|.git\objects\52\7825ab94bbfe3789b8d0ee85a42d71301b2f1f|.git\objects\66\0962cf278e442d3418c65d80aa99c7eb6eff37|.git\objects\83\0c301cc468dc40c58d0d942c6a867efefb7b7c|.git\objects\9a\eb510011f7102c5a709a265db372873c9ce08c|.git\objects\b7\51916dc60c0da4015259bcefd4ca3654faf565|.git\objects\c7\efc9c5474ebb1ae9019dfa2c4ed8be25bdc427|.git\objects\ef\7749fd25be3a661e7a76d8380581d13410884a|.git\objects\pack\pack-1acdeb703a9f10bf1a015df657a07db4086bf77d.idx|.git\logs\refs\remotes\origin\HEAD|.git\COMMIT_EDITMSG|.git\FETCH_HEAD-DESKTOP-7UE47D8-14|.git\FETCH_HEAD-DESKTOP-7UE47D8-8|.git\FETCH_HEAD-XPSK-5|.github\CODE_OF_CONDUCT.md|Public\Remove-AutotaskAPIResource.ps1|.git\hooks\pre-merge-commit.sample|.github\ISSUE_TEMPLATE\bug_report.md|.git\objects\1a\5ad0db68c7edbed8579c03ed0b20750aa077df|.git\objects\36\016b8521157151c611a1008ae5e8558d9adba5|.git\objects\48\a55d2c74237ff6e686ede6ea37c598d8541a36|.git\objects\57\5c437cca2c65ab9df6214147cded98102829bc|.git\objects\6a\4a8dea8028fab6f6bf5c7a62adc6b92149cd84|.git\objects\84\688afa3ee0287aecb6d278924a004dd2e04af2|.git\objects\a1\ec7570d1d2d325801c8b5a564f859f82b971e8|.git\objects\bb\ad5a1b1fb8acdc50d37e8f7ed41e260f5c3616|.git\objects\cc\348ac9d6b963b597f13cbdd6e69a4191b5483c|.git\objects\f1\bcb5d94a224b928e2f403626317e4b3623551b|.git\objects\pack\pack-1acdeb703a9f10bf1a015df657a07db4086bf77d.pack|.git\logs\refs\remotes\origin\master|.git\config|.git\FETCH_HEAD-DESKTOP-7UE47D8-15|.git\FETCH_HEAD-DESKTOP-7UE47D8-9|.git\FETCH_HEAD-XPSK-6|.github\Contributing.md|Public\Set-AutotaskAPIResource.ps1|.git\hooks\pre-push.sample|.github\ISSUE_TEMPLATE\feature_request.md|.git\objects\22\af01227058a42594992302553f6158d4a6b9c7|.git\objects\37\07086ea19893f898d1136fe6977c312c496d09|.git\objects\48\b4a3bf935ddd7bd982f0ffe1655a2b2173f287|.git\objects\58\35baef5d3e98c905d28fdd50932cb9175214f1|.git\objects\6f\10111cc9a47dc3a5e83b56ebadf67055d66741|.git\objects\8e\4c61256331b2fa10b545425bd37afa47d06ec6|.git\objects\b1\1d31370eff3a2d35dee7849c02ba7a10f88065|.git\description|.git\FETCH_HEAD-DESKTOP-7UE47D8-16|.git\FETCH_HEAD-XPSK|.git\FETCH_HEAD-XPSK-7|.github\FUNDING.yml</S>
+          <S N="GUID">125f3875-e1de-48d1-afeb-17e91f36efe8</S>
+          <S N="PowerShellVersion">5.0</S>
+          <S N="CompanyName">Lime Networks / CyberDrain.com</S>
+        </MS>
+      </Obj>
+      <S N="InstalledLocation">C:\Users\tharshberger\OneDrive - Fulcra Networks\Documents\PowerShell\Modules\AutoTaskAPI\1.2.2</S>
+    </MS>
+  </Obj>
+</Objs>
