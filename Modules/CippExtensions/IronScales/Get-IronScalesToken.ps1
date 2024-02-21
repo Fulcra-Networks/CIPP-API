@@ -17,8 +17,6 @@ function Get-IronScalesToken {
         $ClientSecret = $ENV:IronScalesSecret
     }
 
-    Write-Host "$($Configuration.ApiHost) ---> $($IronScalesSecret)"
-
     #TODO: Move scopes to config
     $scopes = @("partner.all")
     $body = @{
@@ -27,7 +25,6 @@ function Get-IronScalesToken {
     }
     try {
         $resp = Invoke-RestMethod -Method Post -ContentType "application/json" -Uri "$($Configuration.ApiHost+$is_endpoint.auth)" -Body $($body|ConvertTo-Json) 
-        Write-Host $resp
         return $resp.jwt
     }
     catch {

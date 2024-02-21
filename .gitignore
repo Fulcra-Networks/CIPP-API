@@ -8,3 +8,7 @@ Cache_*
 Logs
 ExcludedTenants
 SendNotifications/config.json
+.vscode/extensions.json
+.vscode/launch.json
+.vscode/settings.json
+.vscode/tasks.json

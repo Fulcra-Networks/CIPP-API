@@ -2,7 +2,8 @@ $Public = @(Get-ChildItem -Path $PSScriptRoot\Public\*.ps1 -ErrorAction Silently
 $Private = @(Get-ChildItem -Path $PSScriptRoot\private\*.ps1 -ErrorAction SilentlyContinue)
 $NinjaOne = @(Get-ChildItem -Path $PSScriptRoot\NinjaOne\*.ps1 -ErrorAction SilentlyContinue)
 $IronScales = @(Get-ChildItem -Path $PSScriptRoot\IronScales\*.ps1 -ErrorAction SilentlyContinue)
-$Functions = $Public + $Private + $NinjaOne + $IronScales
+$Autotask = @(Get-ChildItem -Path $PSScriptRoot\Autotask\*.ps1 -ErrorAction SilentlyContinue)
+$Functions = $Public + $Private + $NinjaOne + $IronScales + $Autotask
 foreach ($import in @($Functions)) {
     try {
         . $import.FullName

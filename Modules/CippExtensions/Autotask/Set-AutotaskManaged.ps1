@@ -1,0 +1,29 @@
+function Set-AutotaskManaged {
+    [CmdletBinding()]
+    param (
+        $CIPPMapping,
+        $APIName,
+        $Request
+    )
+
+    
+    $Table = Get-CippTable -tablename 'CippMapping'
+
+    foreach ($Mapping in ([pscustomobject]$Request.body).psobject.properties) {        
+        ConvertTo-Json $Mapping|Out-File 'C:\temp\json_shit_props.json' -Force
+
+        $Filter = "PartitionKey eq 'Mapping' and AutotaskPSAName eq '$($mapping.name)'"
+        $res = Get-CIPPAzDataTableEntity @CIPPMapping -Filter $Filter
+
+        Update-AzDataTableEntity @Table -Entity @{
+            PartitionKey = $res.PartitionKey
+            RowKey       = $res.RowKey
+            'IsManaged'  = "$($mapping.value)"
+        }
+
+        Write-LogMessage -API $APINAME -user $request.headers.'x-ms-client-principal' -message "Updated 'IsManaged' mapping for $($mapping.name)." -Sev 'Info' 
+    }
+    $Result = [pscustomobject]@{'Results' = "Successfully edited mapping table." }
+
+    Return $Result
+}

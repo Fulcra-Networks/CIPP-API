@@ -39,6 +39,11 @@ try {
                   $token = Get-IronScalesToken -configuration $Configuration.IronScales
                   $Results = [pscustomobject]@{"Results" = "Succesfully Connected to IronScales" }
             }
+            "Autotask" {
+                  Write-Host "Testing Autotask integration...."
+                  $token = Get-AutotaskToken -configuration $Configuration.Autotask
+                  $Results = [pscustomobject]@{"Results" = "Succesfully Connected to Autotask" }
+            }
       }
 }
 catch {
