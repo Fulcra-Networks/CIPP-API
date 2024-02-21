@@ -1,5 +1,5 @@
 # Input bindings are passed in via param block.
-param($Timer)
+param($Timer, $QueueItem)
 
 try {
     Write-LogMessage -API "Scheduler_IronScales" -tenant "none" -message "Starting IronScales processing." -sev Info
