@@ -10,8 +10,6 @@ function Set-AutotaskManaged {
     $Table = Get-CippTable -tablename 'CippMapping'
 
     foreach ($Mapping in ([pscustomobject]$Request.body).psobject.properties) {        
-        ConvertTo-Json $Mapping|Out-File 'C:\temp\json_shit_props.json' -Force
-
         $Filter = "PartitionKey eq 'Mapping' and AutotaskPSAName eq '$($mapping.name)'"
         $res = Get-CIPPAzDataTableEntity @CIPPMapping -Filter $Filter
 
