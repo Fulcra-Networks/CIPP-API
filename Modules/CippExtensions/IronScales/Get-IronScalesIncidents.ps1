@@ -51,7 +51,10 @@ function New-IronScalestickets {
                             $ATCompany = Get-AutotaskAPIResource -resource Companies -SimpleSearch "companyname beginswith $($company.Customername.Substring(0,4))" 
                             $tTitle = "[IronScales] New Incident(s) for $($company.CustomerName)"
                             
-                            if(Get-ExistingTicket $tTitle){ continue }
+                            if(Get-ExistingTicket $tTitle){
+                                Write-LogMessage -API 'IronScales' -tenant 'none' -message "An existing Autotask ticket was found for $($company.customername)" -Sev Info
+                                continue
+                            }
                             
 
                             $body = Get-BodyForTicket $company
@@ -65,7 +68,10 @@ function New-IronScalestickets {
                         Write-LogMessage -API 'IronScales' -tenant 'none' -message "Creating Autotask ticket for managed companies" -Sev Info
                         $mTitle = "[IronScales-Managed] New Incident(s)"
 
-                        if(Get-ExistingTicket $mTitle){ continue }
+                        if(Get-ExistingTicket $mTitle){ 
+                            Write-LogMessage -API 'IronScales' -tenant 'none' -message "An existing Autotask ticket was found for managed companies" -Sev Info
+                            continue 
+                        }
 
                         New-AutotaskTicket -atCompany $FulcraATCompany `
                             -title $mTitle `
