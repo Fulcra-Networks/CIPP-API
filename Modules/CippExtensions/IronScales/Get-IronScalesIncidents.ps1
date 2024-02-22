@@ -226,5 +226,5 @@ function Get-BodyForTicket {
     foreach($incident in $company.Incidents){
         $body += "$($company.CustomerName)`nEmail Subject: $($incident.emailSubject)`nEmail Recipient: $($incident.recipientEmail)`nAffected Mailboxes: $($incident.affectedMailboxesCount)`n"
     }
-    return $body
+    return ($body -replace '[\u201c-\u201d]','')
 }
