@@ -3,7 +3,7 @@ function New-AutotaskTicket {
     param($atCompany, $title, $description, $estHr = 0.1)
     
     try{
-        Get-AutotaskToken -configuration $Configuration.Autotask
+        Get-AutotaskToken -configuration $Configuration.Autotask | Out-Null
         
         $ticket = New-AutotaskBody -Resource Tickets -NoContent
         $ticket.Id                      = "0"                   #Always 0 for a new ticket
@@ -25,7 +25,7 @@ function New-AutotaskTicket {
         New-AutotaskAPIResource -Resource Tickets -Body $ticket
     }
     catch {
-        Write-LogMessage -API 'Autotask' -tenant 'none' -message "Error creating ticket. $($_.Exception.Message)" -Sev Info
+        Write-LogMessage -API 'Autotask' -tenant 'none' -message "Error creating ticket. $($_.Exception.Message)" -Sev Error
     }
 }
 

@@ -47,6 +47,7 @@ function New-IronScalestickets {
                             $managed_issues_body += Get-BodyForTicket $company
                         }
                         else {
+                            Write-LogMessage -API 'IronScales' -tenant 'none' -message "Creating Autotask ticket for IronScales company $($company.customername)" -Sev Info
                             $ATCompany = Get-AutotaskAPIResource -resource Companies -SimpleSearch "companyname beginswith $($company.Customername.Substring(0,4))" 
                             $tTitle = "[IronScales] New Incident(s) for $($company.CustomerName)"
                             
@@ -61,6 +62,7 @@ function New-IronScalestickets {
                         }
                     }
                     if($managed_issues_body.Count -ne 0){
+                        Write-LogMessage -API 'IronScales' -tenant 'none' -message "Creating Autotask ticket for managed companies" -Sev Info
                         $mTitle = "[IronScales-Managed] New Incident(s)"
 
                         if(Get-ExistingTicket $mTitle){ continue }
@@ -130,7 +132,7 @@ function Get-IronScalesIncidents {
     $all_unclassified = @()
     foreach($company in $SCRIPT:Companies){
         try{
-            Write-LogMessage -API "IronScales" -tenant "none" -message "Getting unclassified incidents for $($company.name):$($company.Id)" -sev Info
+            Write-LogMessage -API "IronScales" -tenant "none" -message "Getting unclassified incidents for $($company.name):$($company.Id)" -sev Debug
             $incidents = Get-Incidents $company.Id
 
             if($incidents.Length -gt 0){
@@ -147,7 +149,7 @@ function Get-IronScalesIncidents {
         }
     }
 
-    Write-LogMessage -API "IronScales" -tenant "none" -message "Got $($all_unclassified.Length) companies with unclassified incidents." -sev Info
+    Write-LogMessage -API "IronScales" -tenant "none" -message "Got $($all_unclassified.Length) companies with unclassified incidents." -sev Debug
     
     
     New-IronScalestickets $all_unclassified
@@ -159,9 +161,6 @@ function Get-Companies {
         return
     }
 
-    #Write-Host "Getting Companies"
-    #Write-Host $SCRIPT:JWT
-
     $reqargs = @{
         Uri = "$($SCRIPT:apiHost+$is_endpoint.Companies+"list/")"
         Headers = @{
@@ -170,7 +169,6 @@ function Get-Companies {
     }
 
     $resp = Invoke-RestMethod @reqargs
-    #Write-Host $resp
     $SCRIPT:Companies = $resp.companies
 }
 
