@@ -1,6 +1,6 @@
 #Hints on int values below
 function New-AutotaskTicket {
-    param($atCompanyId, $title, $description, $estHr = 0.1)
+    param($atCompanyId, $title, $description, $estHr = 0.1, $issueType, $subIssueType, $ticketType="5")
     
     try{
         Get-AutotaskToken -configuration $Configuration.Autotask | Out-Null
@@ -13,8 +13,8 @@ function New-AutotaskTicket {
         $ticket.ticketCategory          = "3"
         $ticket.ticketType              = "5"
         $ticket.serviceLevelAgreementID = "1"
-        $ticket.issueType               = "29"
-        $ticket.subIssueType            = "323"
+        $ticket.issueType               = $issueType
+        $ticket.subIssueType            = $subIssueType
         $ticket.title                   = $title
         $ticket.description             = $description
         $ticket.source                  = "8"

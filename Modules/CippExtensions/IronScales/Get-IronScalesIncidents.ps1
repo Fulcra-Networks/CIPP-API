@@ -73,7 +73,10 @@ function New-IronScalestickets {
 
                         New-AutotaskTicket -atCompany 0 `
                             -title $mTitle `
-                            -description ($managed_issues_body|Join-String)
+                            -description ($managed_issues_body|Join-String) `
+                            -issueType "29" `
+                            -subIssueType "323"
+
                     }
                 }
             }
