@@ -11,7 +11,7 @@ function Get-AutotaskManaged {
         if($null -ne $_.AutotaskPSAName -and "" -ne $_.AutotaskPSAName){
             [PSCustomObject]@{
                 name  = "$($_.AutotaskPSAName)"
-                value = Get-ManagedState $_
+                value = [bool](Get-ManagedState $_)
                 aid   = "$($_.AutotaskPSA)"
             }
         }

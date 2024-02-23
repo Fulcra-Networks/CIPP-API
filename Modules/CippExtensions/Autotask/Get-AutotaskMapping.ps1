@@ -18,7 +18,7 @@ function Get-AutotaskMapping {
         $Configuration = ((Get-CIPPAzDataTableEntity @Table).config | ConvertFrom-Json -ea stop).Autotask
         
         Get-AutotaskToken -configuration $Configuration | Out-Null
-        $RawAutotaskCustomers = Get-AutotaskAPIResource -Resource Companies -SimpleSearch "isactive eq $true"
+        $RawAutotaskCustomers = Get-AutotaskAPIResource -Resource Companies -SearchQuery "{'filter':[{'op':'and',items:[{'op':'eq','field':'isactive','value':true},{'op':'eq','field':'companyType','value':'1'}]}]}"
     } catch {
         $Message = if ($_.ErrorDetails.Message) {
             Get-NormalizedError -Message $_.ErrorDetails.Message
@@ -26,18 +26,19 @@ function Get-AutotaskMapping {
             $_.Exception.message
         }
         
-        Write-LogMessage -Message "Could not get Autotask Clients, error: $Message " -Level Error -tenant 'CIPP' -API 'HaloMapping'
+        Write-LogMessage -Message "Could not get Autotask Clients, error: $Message " -Level Error -tenant 'CIPP' -API 'AutotaskMapping'
         $RawAutotaskCustomers = @(@{name = "Could not get Autotask Clients, error: $Message" }) 
     }
     
-    $AutotaskCustomers = $RawAutotaskCustomers| ForEach-Object {
+    $AutotaskCustomers = $RawAutotaskCustomers | Sort-Object -Property companyName | ForEach-Object {
         [PSCustomObject]@{
             name  = $_.companyName
             value = "$($_.id)"
         }
     }
     
-    $Tenants = Get-Tenants -IncludeAll
+    $Tenants = Get-Tenants
+
     $MappingObj = [PSCustomObject]@{
         Tenants           = @($Tenants)
         AutotaskCustomers = @($AutotaskCustomers)

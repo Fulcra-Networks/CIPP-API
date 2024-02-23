@@ -7,7 +7,6 @@ function Set-AutotaskMapping {
     )
 
     foreach ($Mapping in ([pscustomobject]$Request.body.mappings).psobject.properties) {
-        Write-Host $(ConvertTo-Json $Mapping)
         $AddObject = @{
             PartitionKey  = 'Mapping'
             RowKey        = "$($mapping.name)"

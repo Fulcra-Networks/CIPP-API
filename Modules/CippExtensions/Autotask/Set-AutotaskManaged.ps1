@@ -18,7 +18,7 @@ function Set-AutotaskManaged {
         Update-AzDataTableEntity @Table -Entity @{
             PartitionKey = $res.PartitionKey
             RowKey       = $res.RowKey
-            'IsManaged'  = "$($mapping.value)"
+            'IsManaged'  = [bool]$mapping.value
         }
 
         Write-LogMessage -API $APINAME -user $request.headers.'x-ms-client-principal' -message "Updated 'IsManaged' mapping for $($mapping.name)." -Sev 'Info' 

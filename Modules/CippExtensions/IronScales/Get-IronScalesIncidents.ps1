@@ -30,17 +30,16 @@ function New-IronScalestickets {
 
                     Get-AutotaskToken -configuration $Configuration.Autotask
 
-                    $FulcraATCompany = Get-AutotaskAPIResource -resource Companies -SimpleSearch "companyname beginswith Fulcra" 
                     $managed_issues_body = @()
 
                     foreach($company in $IronScalesIncidents) {
-                        $AtCompany = $MappingFile | Where-Object { $_.AutotaskPSAName -eq $company.customername }
+                        $AtCompany = $MappingFile | Where-Object { $_.IronScalesId -eq $company.Id }
 
                         if($company.companyName -eq 'Fulcra Networks'){
                             $managed_issues_body += Get-BodyForTicket $company
                         }
                         elseif($null -eq $AtCompany){
-                            Write-LogMessage -API 'IronScales' -tenant 'none' -message "IronScales company $($company.customername) does not have corresponding Autotask company." -Sev Info
+                            Write-LogMessage -API 'IronScales' -tenant 'none' -message "IronScales company $($company.customername) is not mapped." -Sev Info
                             continue
                         }
                         elseif($AtCompany.IsManaged) {
@@ -48,7 +47,6 @@ function New-IronScalestickets {
                         }
                         else {
                             Write-LogMessage -API 'IronScales' -tenant 'none' -message "Creating Autotask ticket for IronScales company $($company.customername)" -Sev Info
-                            $ATCompany = Get-AutotaskAPIResource -resource Companies -SimpleSearch "companyname beginswith $($company.Customername.Substring(0,4))" 
                             $tTitle = "[IronScales] New Incident(s) for $($company.CustomerName)"
                             
                             if(Get-ExistingTicket $tTitle){
@@ -59,7 +57,7 @@ function New-IronScalestickets {
 
                             $body = Get-BodyForTicket $company
                             $estHr = 0.1*$company.Incidents.Count
-                            New-AutotaskTicket -atCompany $ATCompany `
+                            New-AutotaskTicket -atCompany $ATCompany.AutotaskPSA `
                                 -title $tTitle `
                                 -description ($body|Join-String) -estHr $estHr
                         }
@@ -73,7 +71,7 @@ function New-IronScalestickets {
                             continue 
                         }
 
-                        New-AutotaskTicket -atCompany $FulcraATCompany `
+                        New-AutotaskTicket -atCompany 0 `
                             -title $mTitle `
                             -description ($managed_issues_body|Join-String)
                     }

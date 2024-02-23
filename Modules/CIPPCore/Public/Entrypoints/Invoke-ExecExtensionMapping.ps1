@@ -25,6 +25,10 @@ Function Invoke-ExecExtensionMapping {
                 $Body = Get-AutotaskManaged -CIPPMapping $Table
             }
 
+            'IronScales' {
+                $Body = Get-IronScalesMapping -CIPPMapping $Table
+            }
+
             'Halo' {
                 $Body = Get-HaloMapping -CIPPMapping $Table
             }
@@ -49,7 +53,11 @@ Function Invoke-ExecExtensionMapping {
 
                 'AutotaskManaged' {
                     $Body = Set-AutotaskManaged -CIPPMapping $Table -APIName $APIName -Request $Request
-                } 
+                }
+                
+                'IronScales' {
+                    $Body = Set-IronScalesMapping -CIPPMapping $Table -APIName $APIName -Request $Request
+                }
 
                 'Halo' {
                     $body = Set-HaloMapping -CIPPMapping $Table -APIName $APIName -Request $Request
@@ -86,8 +94,6 @@ Function Invoke-ExecExtensionMapping {
         Write-LogMessage -API $APINAME -user $request.headers.'x-ms-client-principal' -message "mapping API failed. $($_.Exception.Message)" -Sev 'Error'
         $body = [pscustomobject]@{'Results' = "Failed. $($_.Exception.Message)" }
     }
-
-    Write-Host $(ConvertTo-Json $Body -Depth 5)
 
 # Associate values to output bindings by calling 'Push-OutputBinding'.
     Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
