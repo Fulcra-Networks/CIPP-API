@@ -146,6 +146,7 @@ function Get-IronScalesIncidents {
 
             if($incidents.Length -gt 0){
                 $companyIncidents = [PSCustomObject]@{
+                    Id = $company.Id
                     CustomerName = $company.name
                     Incidents = $incidents
                 }
