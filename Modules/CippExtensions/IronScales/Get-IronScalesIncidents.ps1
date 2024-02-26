@@ -59,9 +59,11 @@ function New-IronScalestickets {
                             $estHr = 0.1*$company.Incidents.Count
                             New-AutotaskTicket -atCompany $ATCompany.AutotaskPSA `
                                 -title $tTitle `
-                                -description ($body|Join-String) -estHr $estHr`
+                                -description ($body|Join-String) `
+                                -estHr $estHr `
                                 -issueType "29" `
                                 -subIssueType "323"
+
                         }
                     }
                     if($managed_issues_body.Count -ne 0){
@@ -230,5 +232,6 @@ function Get-BodyForTicket {
     foreach($incident in $company.Incidents){
         $body += "$($company.CustomerName)`nEmail Subject: $($incident.emailSubject)`nEmail Recipient: $($incident.recipientEmail)`nAffected Mailboxes: $($incident.affectedMailboxesCount)`n"
     }
+    $body += "`n`nTo classify the incident(s) go to https://members.ironscales.com/irontraps/incidents/unclassified"
     return ($body -replace '[\u201c-\u201d]','')
 }
