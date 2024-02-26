@@ -59,7 +59,9 @@ function New-IronScalestickets {
                             $estHr = 0.1*$company.Incidents.Count
                             New-AutotaskTicket -atCompany $ATCompany.AutotaskPSA `
                                 -title $tTitle `
-                                -description ($body|Join-String) -estHr $estHr
+                                -description ($body|Join-String) -estHr $estHr`
+                                -issueType "29" `
+                                -subIssueType "323"
                         }
                     }
                     if($managed_issues_body.Count -ne 0){
