@@ -14,3 +14,4 @@ Import-Module "$CippRoot\Modules\DNSHealth"
 Import-Module "$CippRoot\Modules\CippQueue"
 Import-Module "$CippRoot\Modules\CippCore"
 Import-Module "$CippRoot\Modules\AutoTaskAPI"
+Get-CIPPAuthentication
