@@ -12,7 +12,7 @@ function Set-AutotaskManaged {
     Write-LogMessage -API $APINAME -user $request.headers.'x-ms-client-principal' -message $(ConvertTo-Json $Request.body -Depth 10) -Sev Debug
 
     foreach ($Mapping in ([pscustomobject]$Request.body).psobject.properties) {        
-        $Filter = "PartitionKey eq 'Mapping' and AutotaskPSAName eq '$($mapping.name)'"
+        $Filter = "PartitionKey eq 'Mapping' and RowKey eq '$($mapping.name)'"
         $res = Get-CIPPAzDataTableEntity @CIPPMapping -Filter $Filter
 
         Update-AzDataTableEntity @Table -Entity @{

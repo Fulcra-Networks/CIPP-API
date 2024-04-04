@@ -10,7 +10,8 @@ function Get-AutotaskManaged {
     $managed = Get-CIPPAzDataTableEntity @CIPPMapping -Filter $Filter | ForEach-Object {
         if($null -ne $_.AutotaskPSAName -and "" -ne $_.AutotaskPSAName){
             [PSCustomObject]@{
-                name  = "$($_.AutotaskPSAName)"
+                name  = "$($_.RowKey)"
+                label = "$($_.AutotaskPSAName)"
                 value = [bool](Get-ManagedState $_)
                 aid   = "$($_.AutotaskPSA)"
             }
