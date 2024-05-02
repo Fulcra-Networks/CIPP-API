@@ -37,7 +37,7 @@ function Get-AutotaskMapping {
         }
     }
     
-    $Tenants = Get-Tenants
+    $Tenants = Get-Tenants -IncludeErrors
 
     $MappingObj = [PSCustomObject]@{
         Tenants           = @($Tenants)
