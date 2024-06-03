@@ -2,8 +2,10 @@ using namespace System.Net
 
 Function Invoke-ExecExtensionMapping {
     <#
-        .FUNCTIONALITY
+    .FUNCTIONALITY
         Entrypoint
+    .ROLE
+        CIPP.Extension.ReadWrite
     #>
     [CmdletBinding()]
     param($Request, $TriggerMetadata)
