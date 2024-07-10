@@ -9,7 +9,7 @@ Function Invoke-ExecExtensionMapping {
     #>
     [CmdletBinding()]
     param($Request, $TriggerMetadata)
-    
+
     $APIName = $TriggerMetadata.FunctionName
     Write-LogMessage -user $request.headers.'x-ms-client-principal' -API $APINAME -message 'Accessed this API' -Sev 'Debug'
 
@@ -31,17 +31,20 @@ Function Invoke-ExecExtensionMapping {
                 $Body = Get-IronScalesMapping -CIPPMapping $Table
             }
 
-            'Halo' {
-                $Body = Get-HaloMapping -CIPPMapping $Table
+            'HaloPSA' {
+                $body = Get-HaloMapping -CIPPMapping $Table
             }
-
-            'NinjaOrgs' {
+            'NinjaOne' {
                 $Body = Get-NinjaOneOrgMapping -CIPPMapping $Table
             }
-
-            'NinjaFields' {
+            'NinjaOneFields' {
                 $Body = Get-NinjaOneFieldMapping -CIPPMapping $Table
-
+            }
+            'Hudu' {
+                $Body = Get-HuduMapping -CIPPMapping $Table
+            }
+            'HuduFields' {
+                $Body = Get-HuduFieldMapping -CIPPMapping $Table
             }
         }
     }
@@ -56,19 +59,27 @@ Function Invoke-ExecExtensionMapping {
                 'AutotaskManaged' {
                     $Body = Set-AutotaskManaged -CIPPMapping $Table -APIName $APIName -Request $Request
                 }
-                
+
                 'IronScales' {
                     $Body = Set-IronScalesMapping -CIPPMapping $Table -APIName $APIName -Request $Request
                 }
 
-                'Halo' {
+                'HaloPSA' {
                     $body = Set-HaloMapping -CIPPMapping $Table -APIName $APIName -Request $Request
                 }
-                'NinjaOrgs' {
+                'NinjaOne' {
                     $Body = Set-NinjaOneOrgMapping -CIPPMapping $Table -APIName $APIName -Request $Request
                 }
-                'NinjaFields' {
+                'NinjaOneFields' {
                     $Body = Set-NinjaOneFieldMapping -CIPPMapping $Table -APIName $APIName -Request $Request -TriggerMetadata $TriggerMetadata
+                }
+                'Hudu' {
+                    $Body = Set-HuduMapping -CIPPMapping $Table -APIName $APIName -Request $Request
+                    Register-CIPPExtensionScheduledTasks
+                }
+                'HuduFields' {
+                    $Body = Set-ExtensionFieldMapping -CIPPMapping $Table -APIName $APIName -Request $Request -Extension 'Hudu'
+                    Register-CIPPExtensionScheduledTasks
                 }
             }
         }
