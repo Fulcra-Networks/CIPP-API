@@ -13,4 +13,6 @@ Import-Module "$CippRoot\Modules\AzBobbyTables"
 Import-Module "$CippRoot\Modules\DNSHealth"
 Import-Module "$CippRoot\Modules\CippCore"
 Import-Module "$CippRoot\Modules\AutoTaskAPI"
+Import-Module "$CippRoot\Modules\CippExtensions"
+
 Get-CIPPAuthentication
