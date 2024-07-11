@@ -755,6 +755,9 @@ function Invoke-HuduExtensionSync {
                 } else {
                     $HuduDevice = $HuduDevices | Where-Object { $_.primary_serial -eq $device.serialNumber -or ($_.cards.integrator_name -eq 'cw_manage' -and $_.cards.data.serialNumber -eq $device.serialNumber) }
                 }
+                if($null -eq $HuduDevice){
+                    $HuduDevice = $HuduDevices | Where-Object { $_.name -eq $device.deviceName }
+                }
 
                 [System.Collections.Generic.List[PSCustomObject]]$DeviceLinksFormatted = @()
                 $DeviceLinksFormatted.add((Get-HuduLinkBlock -URL "https://endpoint.microsoft.com/$($Tenant.defaultDomainName)/#blade/Microsoft_Intune_Devices/DeviceSettingsBlade/overview/mdmDeviceId/$($Device.id)" -Icon 'fas fa-laptop' -Title 'Endpoint Manager'))
