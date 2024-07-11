@@ -5,18 +5,18 @@ function Get-IronScalesMapping {
     )
     #Get available mappings
     $Mappings = [pscustomobject]@{}
-    
+
     $Filter = "PartitionKey eq 'Mapping'"
     Get-CIPPAzDataTableEntity @CIPPMapping -Filter $Filter | ForEach-Object {
         if($null -ne $_.IronScalesName -and "" -ne $_.IronScalesName){
             $Mappings | Add-Member -NotePropertyName $_.RowKey -NotePropertyValue @{ label = "$($_.IronScalesName)"; value = "$($_.IronScalesId)" }
         }
     }
-    
+
     $Table = Get-CIPPTable -TableName Extensionsconfig
     try {
         $Configuration = ((Get-CIPPAzDataTableEntity @Table).config | ConvertFrom-Json -ea stop).IronScales
-        
+
         $JWT = Get-IronScalesToken -configuration $configuration
         $reqargs = @{ Uri = "$($Configuration.apiHost+"/company/list/")"; Headers = @{ Authorization = "Bearer $($JWT)"; }}
         $resp = Invoke-RestMethod @reqargs
@@ -27,25 +27,25 @@ function Get-IronScalesMapping {
         } else {
             $_.Exception.message
         }
-        
+
         Write-LogMessage -Message "Could not get IronScales Companies error: $Message " -Level Error -tenant 'CIPP' -API 'IronScalesMapping'
-        $RawCompanies = @(@{name = "Could not get IronScales Companies, error: $Message" }) 
+        $RawCompanies = @(@{name = "Could not get IronScales Companies, error: $Message" })
     }
-    
+
     $IronScalesCompanies = $RawCompanies | Sort-Object -Property name  | ForEach-Object {
         [PSCustomObject]@{
             name  = $_.name
             value = "$($_.id)"
         }
     }
-    
+
     $Tenants = Get-Tenants
-    
+
     $MappingObj = [PSCustomObject]@{
-        Tenants             = @($Tenants)
-        IronScalesCompanies = @($IronScalesCompanies)
-        Mappings            = $Mappings
+        Tenants     = @($Tenants)
+        Companies   = @($IronScalesCompanies)
+        Mappings    = $Mappings
     }
-    
+
     return $MappingObj
 }
