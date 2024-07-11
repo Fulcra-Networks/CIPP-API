@@ -75,7 +75,7 @@ function Register-CIPPExtensionScheduledTasks {
                 $ExistingPushTask = $PushTasks | Where-Object { $_.Tenant -eq $Tenant.defaultDomainName -and $_.SyncType -eq $Extension }
                 if (!$ExistingPushTask -or $Reschedule.IsPresent) {
                     # push cached data to extension
-                    $in30mins = [int64](([datetime]::UtcNow.AddMinutes(30)) - (Get-Date '1/1/1970')).TotalSeconds
+                    $in30mins = [int64](([datetime]::UtcNow.AddMinutes(5)) - (Get-Date '1/1/1970')).TotalSeconds
                     $Task = @{
                         Name          = "$Extension Extension Sync"
                         Command       = @{
