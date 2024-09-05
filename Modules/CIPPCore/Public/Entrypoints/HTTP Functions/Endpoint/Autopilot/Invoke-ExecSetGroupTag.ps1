@@ -19,7 +19,7 @@ Function Invoke-ExecSetGroupTag {
         New-GraphPOSTRequest -uri "https://graph.microsoft.com/beta/deviceManagement/windowsAutopilotDeviceIdentities/$($request.body.Device)/UpdateDeviceProperties" -tenantid $TenantFilter -body $body -method POST
         $Results = "Successfully assigned device to $($Request.body.groupTag) for $($tenantfilter)"
     } catch {
-        $Results = "Could not assign group tag $($Request.body.groupTag) to $($Request.body.device) for $($tenantfilter) Error: $($_.Exception.Message)"
+        $Results = "Could not assign group tag $($Request.body.groupTag) to $($Request.body.device) for $($tenantfilter) Error: $($_.Exception.Message) - $($Request.body)"
     }
 
     $Results = [pscustomobject]@{'Results' = "$results" }
