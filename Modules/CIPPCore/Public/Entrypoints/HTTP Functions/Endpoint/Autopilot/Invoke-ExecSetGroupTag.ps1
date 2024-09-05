@@ -14,7 +14,7 @@ Function Invoke-ExecSetGroupTag {
     $tenantfilter = $Request.Body.TenantFilter
     try {
         $body = @{
-            groupTag = $Request.body.groupTag
+            groupTag = $Request.body.input
         } | ConvertTo-Json
         New-GraphPOSTRequest -uri "https://graph.microsoft.com/beta/deviceManagement/windowsAutopilotDeviceIdentities/$($request.body.Device)/UpdateDeviceProperties" -tenantid $TenantFilter -body $body -method POST
         $Results = "Successfully assigned device to $($Request.body.groupTag) for $($tenantfilter)"
