@@ -1,10 +1,10 @@
 #Hints on int values below
 function New-AutotaskTicket {
     param($atCompanyId, $title, $description, $estHr = 0.1, $issueType, $subIssueType, $ticketType="5")
-    
+
     try{
         Get-AutotaskToken -configuration $Configuration.Autotask | Out-Null
-        
+
         $ticket = New-AutotaskBody -Resource Tickets -NoContent
         $ticket.Id                      = "0"                   #Always 0 for a new ticket
         $ticket.ticketType              = "1"
@@ -21,6 +21,7 @@ function New-AutotaskTicket {
         $ticket.status                  = "1"
         $ticket.queueID                 = "29682833"
         $ticket.estimatedHours          = $estHr
+        $ticket.billingCodeID           = "29682801"            #Worktype = remote
 
         New-AutotaskAPIResource -Resource Tickets -Body $ticket
     }
