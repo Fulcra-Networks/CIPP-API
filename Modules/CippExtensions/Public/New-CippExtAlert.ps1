@@ -15,16 +15,16 @@ function New-CippExtAlert {
                 If ($Configuration.Autotask.enabled) {
                     $TenantId = (Get-Tenants | Where-Object defaultDomainName -EQ $Alert.TenantId).customerId
                     Write-Host "TenantId: $TenantId"
-                    $MappedId = ($MappingFile | Where-Object RowKey -EQ $TenantId).AutotaskPSA
+                    $MappedId = ($MappingTable | Where-Object RowKey -EQ $TenantId).AutotaskPSA
                     Write-Host "MappedId: $MappedId"
-                    if (!$mappedId) { $MappedId = 1 }
+                    if (!$mappedId) { $MappedId = 1 } #This auto assigns to the AT base company.
                     Write-Host "MappedId: $MappedId"
                     New-AutotaskTicket `
                         -Title $Alert.AlertTitle `
                         -Description $Alert.AlertText `
                         -atCompanyId $mappedId `
                         -issueType "29" `
-                        -subIssueType "333"
+                        -subIssueType "328"
                 }
             }
             "HaloPSA" {
