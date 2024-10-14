@@ -16,8 +16,9 @@ function New-CippExtAlert {
                     Get-AutotaskToken -configuration $Configuration.Autotask
 
                     $TenantId = (Get-Tenants | Where-Object defaultDomainName -EQ $Alert.TenantId).customerId
-                    $MappedId = ($MappingTable | Where-Object RowKey -EQ $TenantId).AutotaskPSA
-                    if (!$mappedId) { $MappedId = 1 } #This auto assigns to the AT base company.
+                    $MappingFile = Get-CIPPAzDataTableEntity @MappingTable -Filter "PartitionKey eq 'Mapping'"
+                    $MappedId = ($MappingFile | Where-Object { $_.RowKey -eq $TenantId }).AutotaskPSA
+                    if (!$MappedId) { $MappedId = 1 } #This auto assigns to the AT base company.
                     Write-LogMessage -API 'Webhook Alerts' -tenant $TenantFilter -message "Create AT Ticket for map: $MappedId, Tenant: $TenantId - Title: $($Alert.AlertTitle) - Text: $($Alert.AlertText)" -sev info
                     New-AutotaskTicket `
                         -Title $Alert.AlertTitle `
