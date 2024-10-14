@@ -1,6 +1,14 @@
 #Hints on int values below
 function New-AutotaskTicket {
-    param($atCompanyId, $title, $description, $estHr = 0.1, $issueType, $subIssueType, $ticketType="5")
+    param(
+        $atCompanyId,
+        $title,
+        $description,
+        $estHr = 0.1,
+        $issueType,
+        $subIssueType,
+        $ticketType="5"
+    )
 
     try{
         Get-AutotaskToken -configuration $Configuration.Autotask | Out-Null
@@ -23,7 +31,8 @@ function New-AutotaskTicket {
         $ticket.estimatedHours          = $estHr
         $ticket.billingCodeID           = "29682801"            #Worktype = remote
 
-        New-AutotaskAPIResource -Resource Tickets -Body $ticket
+        $t = New-AutotaskAPIResource -Resource Tickets -Body $ticket
+        Write-LogMessage -API 'Webhook Alerts' -tenant $TenantFilter -message "Created autotask ticket: $t" -sev info
     }
     catch {
         Write-LogMessage -API 'Autotask' -tenant 'none' -message "Error creating ticket. $($_.Exception.Message)" -Sev Error
