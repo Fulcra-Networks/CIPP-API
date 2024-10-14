@@ -25,8 +25,8 @@ function New-CippExtAlert {
                         -Title $Alert.AlertTitle `
                         -Description $Alert.AlertText `
                         -atCompanyId $mappedId `
-                        -issueType "29" ` #Service Management
-                        -subIssueType "327" #Other
+                        -issueType "29" `
+                        -subIssueType "327" #Service Management/Other
                 }
             }
             "HaloPSA" {
