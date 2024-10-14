@@ -13,6 +13,8 @@ function New-CippExtAlert {
         switch ($ConfigItem) {
             "Autotask" {
                 If ($Configuration.Autotask.enabled) {
+                    Get-AutotaskToken -configuration $Configuration.Autotask
+
                     $TenantId = (Get-Tenants | Where-Object defaultDomainName -EQ $Alert.TenantId).customerId
                     Write-Host "TenantId: $TenantId"
                     $MappedId = ($MappingTable | Where-Object RowKey -EQ $TenantId).AutotaskPSA
@@ -23,8 +25,8 @@ function New-CippExtAlert {
                         -Title $Alert.AlertTitle `
                         -Description $Alert.AlertText `
                         -atCompanyId $mappedId `
-                        -issueType "29" `
-                        -subIssueType "328"
+                        -issueType "29" ` #Service Management
+                        -subIssueType "327" #Other
                 }
             }
             "HaloPSA" {
