@@ -14,11 +14,11 @@ function New-IronScalestickets {
 
     if($IronScalesIncidents.length -eq 0){
         Write-LogMessage -API "IronScales" -tenant "none" -message "No incidents received." -sev Info
-        return 
-    } 
+        return
+    }
 
     $MappingTable = Get-CIPPTable -TableName CippMapping
-    $MappingFile = (Get-CIPPAzDataTableEntity @MappingTable)    
+    $MappingFile = (Get-CIPPAzDataTableEntity @MappingTable)
     $Table = Get-CIPPTable -TableName Extensionsconfig
     $Configuration = (Get-CIPPAzDataTableEntity @Table).config | ConvertFrom-Json -Depth 10
 
@@ -48,12 +48,12 @@ function New-IronScalestickets {
                         else {
                             Write-LogMessage -API 'IronScales' -tenant 'none' -message "Creating Autotask ticket for IronScales company $($company.customername)" -Sev Info
                             $tTitle = "[IronScales] New Incident(s) for $($company.CustomerName)"
-                            
+
                             if(Get-ExistingTicket $tTitle){
                                 Write-LogMessage -API 'IronScales' -tenant 'none' -message "An existing Autotask ticket was found for $($company.customername)" -Sev Info
                                 continue
                             }
-                            
+
 
                             $body = Get-BodyForTicket $company
                             $estHr = 0.1*$company.Incidents.Count
@@ -62,6 +62,7 @@ function New-IronScalestickets {
                                 -description ($body|Join-String) `
                                 -estHr $estHr `
                                 -issueType "29" `
+                                -priority "1" `
                                 -subIssueType "323"
 
                         }
@@ -70,15 +71,16 @@ function New-IronScalestickets {
                         Write-LogMessage -API 'IronScales' -tenant 'none' -message "Creating Autotask ticket for managed companies" -Sev Info
                         $mTitle = "[IronScales-Managed] New Incident(s)"
 
-                        if(Get-ExistingTicket $mTitle){ 
+                        if(Get-ExistingTicket $mTitle){
                             Write-LogMessage -API 'IronScales' -tenant 'none' -message "An existing Autotask ticket was found for managed companies" -Sev Info
-                            continue 
+                            continue
                         }
 
                         New-AutotaskTicket -atCompany 0 `
                             -title $mTitle `
                             -description ($managed_issues_body|Join-String) `
                             -issueType "29" `
+                            -priority "1" `
                             -subIssueType "323"
 
                     }
@@ -162,8 +164,8 @@ function Get-IronScalesIncidents {
     }
 
     Write-LogMessage -API "IronScales" -tenant "none" -message "Got $($all_unclassified.Length) companies with unclassified incidents." -sev Debug
-    
-    
+
+
     New-IronScalestickets $all_unclassified
 }
 
@@ -222,7 +224,7 @@ function Get-CompanyUnclassifiedIncidents {
     }
 
     $resp = Invoke-RestMethod @reqargs
-    return $resp.incidents   
+    return $resp.incidents
 }
 
 function Get-BodyForTicket {

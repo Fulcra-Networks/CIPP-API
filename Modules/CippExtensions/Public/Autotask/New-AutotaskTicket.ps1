@@ -7,7 +7,8 @@ function New-AutotaskTicket {
         $estHr = 0.1,
         $issueType,
         $subIssueType,
-        $ticketType="5"
+        $ticketType="5",
+        $priority="2"
     )
 
     try{
@@ -17,7 +18,7 @@ function New-AutotaskTicket {
         $ticket.Id                      = "0"                   #Always 0 for a new ticket
         $ticket.ticketType              = "1"
         $ticket.companyId               = "$($atCompanyId)"
-        $ticket.priority                = "2"
+        $ticket.priority                = $priority
         $ticket.ticketCategory          = "3"
         $ticket.ticketType              = "5"
         $ticket.serviceLevelAgreementID = "1"
