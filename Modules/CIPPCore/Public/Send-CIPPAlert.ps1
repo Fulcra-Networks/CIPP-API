@@ -115,6 +115,7 @@ function Send-CIPPAlert {
                         TenantId   = $TenantFilter
                         AlertText  = "$HTMLContent"
                         AlertTitle = "$($Title)"
+                        AlertJSON = $JSONContent
                     }
                     New-CippExtAlert -Alert $Alert
                     Write-LogMessage -API 'Webhook Alerts' -tenant $TenantFilter -message "Sent PSA alert $title" -sev info
