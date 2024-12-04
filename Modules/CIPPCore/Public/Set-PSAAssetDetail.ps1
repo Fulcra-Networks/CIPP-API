@@ -1,0 +1,117 @@
+<#
+    This command as of now, will connect to the configured PSA (Autotask for now) and retrieve all active assets.
+    After retrieving the list of assets it will query the configured N-Central RMM and retrieve all matching devices,
+    then update the PSA assets that are found, with N-Central asset CPU and RAM detail.
+#>
+function Set-PSAAssetDetail {
+    [CmdletBinding()]
+    param (
+        $APIName = 'Set PSA Asset Detail'
+    )
+
+    $MappingTable = Get-CIPPTable -TableName CippMapping
+    $Table = Get-CIPPTable -TableName Extensionsconfig
+    $Configuration = (Get-CIPPAzDataTableEntity @Table).config | ConvertFrom-Json -Depth 10
+
+    try {
+        $managedCompanies = Get-AutotaskManaged -CIPPMapping $MappingTable
+
+        #Get all AT Configuration Items of type workstation, that are active, that have the "N-central Device ID [UDF]" property set, and Managed
+        #Get-AutotaskAPIResource -Resource ConfigurationItemTypes -SimpleSearch "isactive eq $true "
+        <# ID list of all Asset Types
+                id isActive name
+            -- -------- ----
+            1     True Workstation
+            2     True Server
+            3     True Firewall
+            4     True Wireless Access Point
+            5     True Printer
+            6     True UPS
+            7     True Anti-Virus
+            8     True Domain Registration
+            9     True Software
+            10     True Web Hosting
+            11     True SSL Certificate
+            12     True DVR/NVR/VMS
+            13     True Standard
+            14     True Non-Standard
+            16     True Network Device
+        #>
+        $query = @"
+            { "filter": [
+                    {
+                        "op": "and",
+                        "items": [
+                            {
+                                "op": "eq",
+                                "field": "isactive",
+                                "value": "True"
+                            },
+                            {
+                                "op": "lte",
+                                "field": "configurationItemType",
+                                "value": "2"
+                            },
+                            {
+                                "op": "exist",
+                                "field": "N-central Device ID",
+                                "udf": true
+                            },
+                            {
+                                "op": "in",
+                                "field": "companyID",
+                                "value": $($managedCompanies|Select-Object -ExpandProperty aid|ConvertTo-Json)
+                            }
+                        ]
+                    }
+            ]}
+"@
+
+        Get-AutotaskToken -configuration $Configuration.Autotask
+        New-NCentralConnection -ServerFQDN $Configuration.NCentral -JWT (Get-NCentralJWT)
+
+        $ATDevices = Get-AutotaskAPIResource -Resource ConfigurationItems -SearchQuery $query
+
+        foreach ($ATDevice in $ATDevices){
+            #get the NC device info using the "N-central Device ID [UDF]""
+            $i = [array]::indexof($ATDevice.userDefinedFields.name, "N-central Device ID")
+            $NCid = $ATDevice.userDefinedFields[$i].value
+            #update the AT configuration item
+            #$NCDevice = Get-NCDeviceID "TNS-HYPERV1" | Get-NCDeviceObject
+            $NCDevice = Get-NCDeviceObject $NCid
+
+            Write-Host "Updating $($ATDevices.IndexOf($ATDevice)+1)/$($ATDevices.Count)"
+
+            $body = [PSCustomObject]@{
+                userDefinedFields = @(
+                    [pscustomobject]@{"name" = "RAM"; "value" = "$([math]::Round($NCDevice.computersystem.totalphysicalmemory/([Math]::Pow(1024,3))))GB"};
+                    [pscustomobject]@{"name" = "CPU"; "value" =  "$($NCDevice.processor.name) (x$($NCDevice.processor.numberofcpus))"};
+                    [pscustomobject]@{"name" = "Last Boot Time"; "value" = "$($NCDevice.os.lastbootuptime)"};
+                    [pscustomobject]@{"name" = "OS"; "value" = $NCDevice.os.reportedos};
+                    [pscustomobject]@{"name" = "OS Architecture"; "value" = $NCDevice.os.osarchitecture};
+                    [pscustomobject]@{"name" = "Version"; "value" = $NCDevice.os.version}
+                )
+            }
+
+            $null = Set-AutotaskAPIResource -Resource ConfigurationItemExts -ID $ATDevice.id -body $body
+        }
+
+        return "Updated $($ATDevices.Count) devices"
+    } catch {
+        Write-LogMessage -user $request.headers.'x-ms-client-principal' -API $APINAME -tenant $($TenantFilter) -message "Failed to set alias. Error:$($_.Exception.Message)" -Sev 'Error'
+        throw "Failed to set alias: $($_.Exception.Message)"
+    }
+}
+
+
+##TODO##MOVE TO NCentral Extension dir
+function Get-NCentralJWT {
+    if (!$ENV:NCentralJWT) {
+        $null = Connect-AzAccount -Identity
+        $ClientSecret = (Get-AzKeyVaultSecret -VaultName $ENV:WEBSITE_DEPLOYMENT_ID -Name 'NCentral' -AsPlainText)
+    } else {
+        $ClientSecret = $ENV:NCentralJWT
+    }
+
+    return $ClientSecret
+}

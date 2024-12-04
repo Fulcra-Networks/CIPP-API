@@ -8,4 +8,5 @@
     'Az.Keyvault'   = '3.*'
     'AzBobbyTables' = '2.*'
     'AutoTaskAPI'   = '1.*'
+    'PS-NCentral'   = '1.*'
 }
