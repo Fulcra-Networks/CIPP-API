@@ -10,6 +10,10 @@ function Set-PSAAssetDetail {
         $APIName = 'Set PSA Asset Detail'
     )
 
+    $files = Get-ChildItem ..\..\|Select Name
+    Write-LogMessage -user "CIPP" -API $APIName -tenant "None" -message "$($files)" -sev "Info"
+    return "TEST"
+
 
     $MappingTable = Get-CIPPTable -TableName CippMapping
     $Table = Get-CIPPTable -TableName Extensionsconfig
