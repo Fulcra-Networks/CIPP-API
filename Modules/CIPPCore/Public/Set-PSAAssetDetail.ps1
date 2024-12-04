@@ -98,7 +98,7 @@ function Set-PSAAssetDetail {
 
         return "Updated $($ATDevices.Count) devices"
     } catch {
-        Write-LogMessage -user $request.headers.'x-ms-client-principal' -API $APINAME -tenant $($TenantFilter) -message "Failed to set alias. Error:$($_.Exception.Message)" -Sev 'Error'
+        Write-LogMessage -user "CIPP" -API $APINAME -tenant "None" -message "Failed to set PSA Asset Detail. Error:$($_.Exception.Message)" -Sev 'Error'
         throw "Failed to set alias: $($_.Exception.Message)"
     }
 }
