@@ -9,6 +9,8 @@ function Set-PSAAssetDetail {
         $APIName = 'Set PSA Asset Detail'
     )
 
+    Import-Module PS-NCentral
+
     $MappingTable = Get-CIPPTable -TableName CippMapping
     $Table = Get-CIPPTable -TableName Extensionsconfig
     $Configuration = (Get-CIPPAzDataTableEntity @Table).config | ConvertFrom-Json -Depth 10
