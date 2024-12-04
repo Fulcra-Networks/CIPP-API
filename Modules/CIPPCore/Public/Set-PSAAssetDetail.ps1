@@ -15,7 +15,7 @@ function Set-PSAAssetDetail {
 
     try {
         $managedCompanies = Get-AutotaskManaged -CIPPMapping $MappingTable
-        Write-LogMessage -user "CIPP" -API $APIName -tenant "None" -Message "Got $($managedCompanies.Count) managed companies."  -Sev "Info"
+        Write-LogMessage -user "CIPP" -API $APIName -tenant "None" -Message "Got $($managedCompanies.ManagedCusts.Count) managed companies."  -Sev "Info"
 
         #Get all AT Configuration Items of type workstation, that are active, that have the "N-central Device ID [UDF]" property set, and Managed
         #Get-AutotaskAPIResource -Resource ConfigurationItemTypes -SimpleSearch "isactive eq $true "
@@ -61,7 +61,7 @@ function Set-PSAAssetDetail {
                             {
                                 "op": "in",
                                 "field": "companyID",
-                                "value": $($managedCompanies|Select-Object -ExpandProperty aid|ConvertTo-Json)
+                                "value": $($managedCompanies.ManagedCusts|Select-Object -ExpandProperty aid|ConvertTo-Json)
                             }
                         ]
                     }
@@ -69,7 +69,10 @@ function Set-PSAAssetDetail {
 "@
 
         Get-AutotaskToken -configuration $Configuration.Autotask
-        New-NCentralConnection -ServerFQDN $Configuration.NCentral -JWT (Get-NCentralJWT)
+        Write-LogMessage -user "CIPP" -API $APIName -tenant "None" -Message "Connected to Autotask API."  -Sev "Info"
+        $ncJWT = Get-NCentralJWT
+        New-NCentralConnection -ServerFQDN $Configuration.NCentral -JWT $ncJWT
+        Write-LogMessage -user "CIPP" -API $APIName -tenant "None" -Message "Connected to N-Central."  -Sev "Info"
 
         $ATDevices = Get-AutotaskAPIResource -Resource ConfigurationItems -SearchQuery $query
         Write-LogMessage -user "CIPP" -API $APIName -tenant "None" -Message "Got $($ATDevices.Count) Autotask devices."  -Sev "Info"
