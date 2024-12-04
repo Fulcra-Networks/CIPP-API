@@ -11,7 +11,7 @@ function Set-PSAAssetDetail {
     )
 
     $files = Get-ChildItem ..\..\|Select Name
-    Write-LogMessage -user "CIPP" -API $APIName -tenant "None" -message "$($files)" -sev "Info"
+    Write-LogMessage -user "CIPP" -API $APIName -tenant "None" -message "$($files|Join-String)" -sev "Info"
     return "TEST"
 
 
