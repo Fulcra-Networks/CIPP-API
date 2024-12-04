@@ -1,4 +1,4 @@
-Import-Module ..\..\PS-NCentral\NCentralRest\PS-NCentral.psm1
+Import-Module "site\wwwroot\Modules\PS-NCentral\NcentralRest\PS-NCentral.psm1"
 <#
     This command as of now, will connect to the configured PSA (Autotask for now) and retrieve all active assets.
     After retrieving the list of assets it will query the configured N-Central RMM and retrieve all matching devices,
@@ -9,11 +9,6 @@ function Set-PSAAssetDetail {
     param (
         $APIName = 'Set PSA Asset Detail'
     )
-
-    $files = Get-ChildItem ..\..\|Select Name
-    Write-LogMessage -user "CIPP" -API $APIName -tenant "None" -message "$($files|Join-String)" -sev "Info"
-    return "TEST"
-
 
     $MappingTable = Get-CIPPTable -TableName CippMapping
     $Table = Get-CIPPTable -TableName Extensionsconfig
@@ -75,6 +70,8 @@ function Set-PSAAssetDetail {
 
         Get-AutotaskToken -configuration $Configuration.Autotask
         New-NCentralConnection -ServerFQDN $Configuration.NCentral -JWT (Get-NCentralJWT)
+
+        return "TEST"
 
         $ATDevices = Get-AutotaskAPIResource -Resource ConfigurationItems -SearchQuery $query
 
