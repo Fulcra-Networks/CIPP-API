@@ -1,4 +1,3 @@
-Import-Module "site\wwwroot\Modules\PS-NCentral\NcentralRest\PS-NCentral.psm1"
 <#
     This command as of now, will connect to the configured PSA (Autotask for now) and retrieve all active assets.
     After retrieving the list of assets it will query the configured N-Central RMM and retrieve all matching devices,
