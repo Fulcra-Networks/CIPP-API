@@ -71,8 +71,6 @@ function Set-PSAAssetDetail {
         Get-AutotaskToken -configuration $Configuration.Autotask
         New-NCentralConnection -ServerFQDN $Configuration.NCentral -JWT (Get-NCentralJWT)
 
-        return "TEST"
-
         $ATDevices = Get-AutotaskAPIResource -Resource ConfigurationItems -SearchQuery $query
 
         foreach ($ATDevice in $ATDevices){
@@ -99,6 +97,7 @@ function Set-PSAAssetDetail {
             $null = Set-AutotaskAPIResource -Resource ConfigurationItemExts -ID $ATDevice.id -body $body
         }
 
+        Write-LogMessage -user "CIPP" -API $APIName -tenant "None" -Message "Updated $($ATDevices.Count) devices"
         return "Updated $($ATDevices.Count) devices"
     } catch {
         Write-LogMessage -user "CIPP" -API $APINAME -tenant "None" -message "Failed to set PSA Asset Detail. Error:$($_.Exception.Message)" -Sev 'Error'
