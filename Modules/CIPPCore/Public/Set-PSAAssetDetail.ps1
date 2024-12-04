@@ -15,6 +15,7 @@ function Set-PSAAssetDetail {
 
     try {
         $managedCompanies = Get-AutotaskManaged -CIPPMapping $MappingTable
+        Write-LogMessage -user "CIPP" -API $APIName -tenant "None" -Message "Got $($managedCompanies.Count) managed companies."  -Sev "Info"
 
         #Get all AT Configuration Items of type workstation, that are active, that have the "N-central Device ID [UDF]" property set, and Managed
         #Get-AutotaskAPIResource -Resource ConfigurationItemTypes -SimpleSearch "isactive eq $true "
@@ -71,6 +72,7 @@ function Set-PSAAssetDetail {
         New-NCentralConnection -ServerFQDN $Configuration.NCentral -JWT (Get-NCentralJWT)
 
         $ATDevices = Get-AutotaskAPIResource -Resource ConfigurationItems -SearchQuery $query
+        Write-LogMessage -user "CIPP" -API $APIName -tenant "None" -Message "Got $($ATDevices.Count) Autotask devices."  -Sev "Info"
 
         foreach ($ATDevice in $ATDevices){
             #get the NC device info using the "N-central Device ID [UDF]""
@@ -80,7 +82,7 @@ function Set-PSAAssetDetail {
             #$NCDevice = Get-NCDeviceID "TNS-HYPERV1" | Get-NCDeviceObject
             $NCDevice = Get-NCDeviceObject $NCid
 
-            Write-Host "Updating $($ATDevices.IndexOf($ATDevice)+1)/$($ATDevices.Count)"
+            Write-LogMessage -user "CIPP" -API $APIName -tenant "None" -Message "Updating $($ATDevices.IndexOf($ATDevice)+1)/$($ATDevices.Count)"  -Sev "Info"
 
             $body = [PSCustomObject]@{
                 userDefinedFields = @(
@@ -93,10 +95,10 @@ function Set-PSAAssetDetail {
                 )
             }
 
-            $null = Set-AutotaskAPIResource -Resource ConfigurationItemExts -ID $ATDevice.id -body $body
+            $q = Set-AutotaskAPIResource -Resource ConfigurationItemExts -ID $ATDevice.id -body $body
         }
 
-        Write-LogMessage -user "CIPP" -API $APIName -tenant "None" -Message "Updated $($ATDevices.Count) devices"
+        Write-LogMessage -user "CIPP" -API $APIName -tenant "None" -Message "Updated $($ATDevices.Count) devices" -Sev "Info"
         return "Updated $($ATDevices.Count) devices"
     } catch {
         Write-LogMessage -user "CIPP" -API $APINAME -tenant "None" -message "Failed to set PSA Asset Detail. Error:$($_.Exception.Message)" -Sev 'Error'
@@ -114,5 +116,6 @@ function Get-NCentralJWT {
         $ClientSecret = $ENV:NCentralJWT
     }
 
+    Write-LogMessage -user "CIPP" -API $APIName -tenant "None" -Message "Got NCentral api key $($ClientSecret.substring(0,5))..."  -Sev "Info"
     return $ClientSecret
 }
