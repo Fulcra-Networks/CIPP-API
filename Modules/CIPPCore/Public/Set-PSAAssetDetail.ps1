@@ -15,7 +15,7 @@ function Set-PSAAssetDetail {
 
     try {
         $managedCompanies = Get-AutotaskManaged -CIPPMapping $MappingTable
-        Write-LogMessage -user "CIPP" -API $APIName -tenant "None" -Message "Got $($managedCompanies.ManagedCusts.Count) managed companies."  -Sev "Info"
+        #Write-LogMessage -user "CIPP" -API $APIName -tenant "None" -Message "Got $($managedCompanies.ManagedCusts.Count) managed companies."  -Sev "Info"
 
         #Get all AT Configuration Items of type workstation, that are active, that have the "N-central Device ID [UDF]" property set, and Managed
         #Get-AutotaskAPIResource -Resource ConfigurationItemTypes -SimpleSearch "isactive eq $true "
@@ -76,7 +76,7 @@ function Set-PSAAssetDetail {
         #Write-LogMessage -user "CIPP" -API $APIName -tenant "None" -Message "Connected to N-Central."  -Sev "Info"
 
         $ATDevices = Get-AutotaskAPIResource -Resource ConfigurationItems -SearchQuery $query
-        Write-LogMessage -user "CIPP" -API $APIName -tenant "None" -Message "Got $($ATDevices.Count) Autotask devices."  -Sev "Info"
+        #Write-LogMessage -user "CIPP" -API $APIName -tenant "None" -Message "Got $($ATDevices.Count) Autotask devices."  -Sev "Info"
 
         foreach ($ATDevice in $ATDevices){
             #get the NC device info using the "N-central Device ID [UDF]""
@@ -86,7 +86,7 @@ function Set-PSAAssetDetail {
             #$NCDevice = Get-NCDeviceID "TNS-HYPERV1" | Get-NCDeviceObject
             $NCDevice = Get-NCDeviceObject $NCid
 
-            Write-LogMessage -user "CIPP" -API $APIName -tenant "None" -Message "Updating $($ATDevices.IndexOf($ATDevice)+1)/$($ATDevices.Count)"  -Sev "Info"
+            #Write-LogMessage -user "CIPP" -API $APIName -tenant "None" -Message "Updating $($ATDevices.IndexOf($ATDevice)+1)/$($ATDevices.Count)"  -Sev "Info"
 
             $body = [PSCustomObject]@{
                 userDefinedFields = @(
@@ -120,6 +120,6 @@ function Get-NCentralJWT {
         $ClientSecret = $ENV:NCentralJWT
     }
 
-    Write-LogMessage -user "CIPP" -API $APIName -tenant "None" -Message "Got NCentral api key $($ClientSecret.substring(0,5))..."  -Sev "Info"
+    #Write-LogMessage -user "CIPP" -API $APIName -tenant "None" -Message "Got NCentral api key $($ClientSecret.substring(0,5))..."  -Sev "Info"
     return $ClientSecret
 }
