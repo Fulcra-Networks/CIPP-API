@@ -61,7 +61,7 @@ function Set-PSAAssetDetail {
                             {
                                 "op": "in",
                                 "field": "companyID",
-                                "value": $($managedCompanies.ManagedCusts|Select-Object -ExpandProperty aid|ConvertTo-Json)
+                                "value": $($managedCompanies.ManagedCusts|Select-Object -ExpandProperty aid|% {$_ -as [int]}|ConvertTo-Json)
                             }
                         ]
                     }
@@ -69,10 +69,10 @@ function Set-PSAAssetDetail {
 "@
 
         Get-AutotaskToken -configuration $Configuration.Autotask
-        Write-LogMessage -user "CIPP" -API $APIName -tenant "None" -Message "Connected to Autotask API."  -Sev "Info"
+        #Write-LogMessage -user "CIPP" -API $APIName -tenant "None" -Message "Connected to Autotask API."  -Sev "Info"
         $ncJWT = Get-NCentralJWT
         New-NCentralConnection -ServerFQDN $Configuration.NCentral.ApiHost -JWT $ncJWT
-        Write-LogMessage -user "CIPP" -API $APIName -tenant "None" -Message "Connected to N-Central."  -Sev "Info"
+        #Write-LogMessage -user "CIPP" -API $APIName -tenant "None" -Message "Connected to N-Central."  -Sev "Info"
 
         $ATDevices = Get-AutotaskAPIResource -Resource ConfigurationItems -SearchQuery $query
         Write-LogMessage -user "CIPP" -API $APIName -tenant "None" -Message "Got $($ATDevices.Count) Autotask devices."  -Sev "Info"
