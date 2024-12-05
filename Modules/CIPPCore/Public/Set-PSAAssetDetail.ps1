@@ -67,7 +67,7 @@ function Set-PSAAssetDetail {
                     }
             ]}
 "@
-        Write-LogMessage -user "CIPP" -API $APIName -tenant "None" -Message "$query"  -Sev "Info"
+        $query = (ConvertFrom-Json $query) | ConvertTo-Json -Depth 10 -Compress
 
         Get-AutotaskToken -configuration $Configuration.Autotask
         #Write-LogMessage -user "CIPP" -API $APIName -tenant "None" -Message "Connected to Autotask API."  -Sev "Info"
