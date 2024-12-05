@@ -67,6 +67,7 @@ function Set-PSAAssetDetail {
                     }
             ]}
 "@
+        Write-LogMessage -user "CIPP" -API $APIName -tenant "None" -Message "$query"  -Sev "Info"
 
         Get-AutotaskToken -configuration $Configuration.Autotask
         #Write-LogMessage -user "CIPP" -API $APIName -tenant "None" -Message "Connected to Autotask API."  -Sev "Info"
