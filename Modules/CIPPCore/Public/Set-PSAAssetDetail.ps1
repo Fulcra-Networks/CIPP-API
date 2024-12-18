@@ -6,17 +6,44 @@
 function Set-PSAAssetDetail {
     [CmdletBinding()]
     param (
+        $TenantFilter,
         $APIName = 'Set PSA Asset Detail'
     )
 
-    $MappingTable = Get-CIPPTable -TableName CippMapping
-    $Table = Get-CIPPTable -TableName Extensionsconfig
-    $Configuration = (Get-CIPPAzDataTableEntity @Table).config | ConvertFrom-Json -Depth 10
-
     try {
-        $managedCompanies = Get-AutotaskManaged -CIPPMapping $MappingTable
-        #Write-LogMessage -user "CIPP" -API $APIName -tenant "None" -Message "Got $($managedCompanies.ManagedCusts.Count) managed companies."  -Sev "Info"
+        $MappingTable = Get-CIPPTable -TableName CippMapping
+        $Table = Get-CIPPTable -TableName Extensionsconfig
+        $Configuration = (Get-CIPPAzDataTableEntity @Table).config | ConvertFrom-Json -Depth 10
 
+        $TenantTable = Get-CIPPTable -TableName Tenants
+        $Filter = "displayName eq '$TenantFilter' and PartitionKey eq 'Tenants'"
+        $TenantObj = [pscustomobject](Get-CIPPAzDataTableEntity @TenantTable -Filter $Filter)
+
+        <# Next filter the managed companies to get the Autotask ID of the Tenant selected for the job
+        The "name" property is from the CippMapping table and corresponds to the TenantID
+        $TenantFilter is the value passed from the Scheduler Screen - This should be the Tenant ID but may be the domain name.
+            #(Looks like it according to Scheduled tasks table.)
+        We'll need to log that to make sure.
+        #>
+
+        if($null -eq $TenantObj){
+            Write-LogMessage -user "CIPP" -API $APIName -tenant $TenantFilter -Message "No tenant found using filter $($TenantFilter)"  -Sev "Error"
+            return "No tenant matching filter."
+        }
+
+        $managedCompanies = Get-AutotaskManaged -CIPPMapping $MappingTable
+
+        $jobCompany = $managedCompanies | Where-Object { $_.Name -eq $TenantObj.customerId }
+
+        if($null -eq $jobCompany) {
+            Write-LogMessage -user "CIPP" -API $APIName -tenant $TenantFilter -Message "No PSA client found using filter $($TenantFilter)"  -Sev "Error"
+            return "No PSA client matching filter."
+        }
+
+        Write-LogMessage -user "CIPP" -API $APIName -tenant $TenantFilter -Message "Using $($TenantFilter) for filetering managed companies.."  -Sev "Info"
+        Write-LogMessage -user "CIPP" -API $APIName -tenant "None" -Message "Got $($managedCompanies.ManagedCusts.Count) managed companies."  -Sev "Info"
+
+        return "Debug early return."
         #Get all AT Configuration Items of type workstation, that are active, that have the "N-central Device ID [UDF]" property set, and Managed
         #Get-AutotaskAPIResource -Resource ConfigurationItemTypes -SimpleSearch "isactive eq $true "
         <# ID list of all Asset Types
@@ -59,9 +86,9 @@ function Set-PSAAssetDetail {
                                 "udf": true
                             },
                             {
-                                "op": "in",
+                                "op": "eq",
                                 "field": "companyID",
-                                "value": $($managedCompanies.ManagedCusts|Select-Object -ExpandProperty aid|% {$_ -as [int]}|ConvertTo-Json)
+                                "value": ''
                             }
                         ]
                     }
