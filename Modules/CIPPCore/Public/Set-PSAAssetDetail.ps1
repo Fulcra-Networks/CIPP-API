@@ -38,7 +38,7 @@ function Set-PSAAssetDetail {
 
         $managedCompanies = Get-AutotaskManaged -CIPPMapping $MappingTable
 
-        $jobCompany = $managedCompanies | Where-Object { $_.Name -eq $TenantObj.customerId }
+        $jobCompany = $managedCompanies.ManagedCusts | Where-Object { $_.Name -eq $TenantObj.customerId }
 
         if($null -eq $jobCompany) {
             Write-LogMessage -user "CIPP" -API $APIName -tenant $TenantFilter -Message "No PSA client found using filter $($TenantFilter)"  -Sev "Error"
@@ -48,8 +48,7 @@ function Set-PSAAssetDetail {
         Write-LogMessage -user "CIPP" -API $APIName -tenant $TenantFilter -Message "Using $($TenantFilter) for filetering managed companies.."  -Sev "Info"
         Write-LogMessage -user "CIPP" -API $APIName -tenant "None" -Message "Got $($managedCompanies.ManagedCusts.Count) managed companies."  -Sev "Info"
 
-        return "Debug early return."
-        #Get all AT Configuration Items of type workstation, that are active, that have the "N-central Device ID [UDF]" property set, and Managed
+        #Get all AT Configuration Items of type workstation, that are active, that have the "N-central Device ID [UDF]" property set, and Managed for the Client
         #Get-AutotaskAPIResource -Resource ConfigurationItemTypes -SimpleSearch "isactive eq $true "
         <# ID list of all Asset Types
                 id isActive name
@@ -93,7 +92,7 @@ function Set-PSAAssetDetail {
                             {
                                 "op": "eq",
                                 "field": "companyID",
-                                "value": ''
+                                "value": "$($jobCompany.aid)"
                             }
                         ]
                     }
