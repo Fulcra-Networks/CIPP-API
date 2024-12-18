@@ -11,12 +11,17 @@ function Set-PSAAssetDetail {
     )
 
     try {
+
+        if($TenantFilter -eq 'AllTenants') {
+            return "Cannot run job for all Tenants."
+        }
+
         $MappingTable = Get-CIPPTable -TableName CippMapping
         $Table = Get-CIPPTable -TableName Extensionsconfig
         $Configuration = (Get-CIPPAzDataTableEntity @Table).config | ConvertFrom-Json -Depth 10
 
         $TenantTable = Get-CIPPTable -TableName Tenants
-        $Filter = "displayName eq '$TenantFilter' and PartitionKey eq 'Tenants'"
+        $Filter = "defaultDomainName eq '$TenantFilter' and PartitionKey eq 'Tenants'"
         $TenantObj = [pscustomobject](Get-CIPPAzDataTableEntity @TenantTable -Filter $Filter)
 
         <# Next filter the managed companies to get the Autotask ID of the Tenant selected for the job
