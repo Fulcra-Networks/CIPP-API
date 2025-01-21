@@ -101,36 +101,50 @@ function Set-PSAAssetDetail {
         $query = (ConvertFrom-Json $query) | ConvertTo-Json -Depth 10 -Compress
 
         Get-AutotaskToken -configuration $Configuration.Autotask
-        #Write-LogMessage -user "CIPP" -API $APIName -tenant "None" -Message "Connected to Autotask API."  -Sev "Info"
         $ncJWT = Get-NCentralJWT
         New-NCentralConnection -ServerFQDN $Configuration.NCentral.ApiHost -JWT $ncJWT
-        #Write-LogMessage -user "CIPP" -API $APIName -tenant "None" -Message "Connected to N-Central."  -Sev "Info"
+        Connect-Ncentral -ApiHost $Configuration.NCentral.ApiHost -key ($ncJWT|ConvertTo-SecureString -AsPlainText -Force)
 
         $ATDevices = Get-AutotaskAPIResource -Resource ConfigurationItems -SearchQuery $query
-        #Write-LogMessage -user "CIPP" -API $APIName -tenant "None" -Message "Got $($ATDevices.Count) Autotask devices."  -Sev "Info"
 
         foreach ($ATDevice in $ATDevices){
-            #get the NC device info using the "N-central Device ID [UDF]""
-            $i = [array]::indexof($ATDevice.userDefinedFields.name, "N-central Device ID")
-            $NCid = $ATDevice.userDefinedFields[$i].value
-            #update the AT configuration item
-            #$NCDevice = Get-NCDeviceID "TNS-HYPERV1" | Get-NCDeviceObject
-            $NCDevice = Get-NCDeviceObject $NCid
+            try{
+                $NCid = $ATDevice.userDefinedFields | Where-Object {$_.Name -eq 'N-central Device ID'}
+                $eligibleAT = $ATDevice.userDefinedFields|?{$_.Name -eq 'OS Upgrade Eligible'}
 
-            #Write-LogMessage -user "CIPP" -API $APIName -tenant "None" -Message "Updating $($ATDevices.IndexOf($ATDevice)+1)/$($ATDevices.Count)"  -Sev "Info"
+                $NCDevice = Get-NCentralDeviceDetail -DeviceId $NCid.Value
 
-            $body = [PSCustomObject]@{
-                userDefinedFields = @(
-                    [pscustomobject]@{"name" = "RAM"; "value" = "$([math]::Round($NCDevice.computersystem.totalphysicalmemory/([Math]::Pow(1024,3))))GB"};
-                    [pscustomobject]@{"name" = "CPU"; "value" =  "$($NCDevice.processor.name) (x$($NCDevice.processor.numberofcpus))"};
-                    [pscustomobject]@{"name" = "Last Boot Time"; "value" = "$($NCDevice.os.lastbootuptime)"};
-                    [pscustomobject]@{"name" = "OS"; "value" = $NCDevice.os.reportedos};
-                    [pscustomobject]@{"name" = "OS Architecture"; "value" = $NCDevice.os.osarchitecture};
-                    [pscustomobject]@{"name" = "Version"; "value" = $NCDevice.os.version}
-                )
+                #update the AT configuration item
+                $body = [PSCustomObject]@{ userDefinedFields = [System.Collections.ArrayList]::new() }
+                $body.userDefinedFields.add([pscustomobject]@{"name" = "RAM"; "value" = "$([math]::Round($NCDevice.data.computersystem.totalphysicalmemory/([Math]::Pow(1024,3))))GB"})|Out-Null
+                $body.userDefinedFields.add([pscustomobject]@{"name" = "CPU"; "value" =  "$($NCDevice.data.processor.name) (x$($NCDevice.processor.numberofcpus))"})|Out-Null
+                $body.userDefinedFields.add([pscustomobject]@{"name" = "Last Boot Time"; "value" = "$($NCDevice.data.os.lastbootuptime)"})|Out-Null
+                $body.userDefinedFields.add([pscustomobject]@{"name" = "OS"; "value" = $NCDevice.data.os.reportedos})|Out-Null
+                $body.userDefinedFields.add([pscustomobject]@{"name" = "OS Architecture"; "value" = $NCDevice.data.os.osarchitecture})|Out-Null
+                $body.userDefinedFields.add([pscustomobject]@{"name" = "Version"; "value" = $NCDevice.data.os.version})|Out-Null
+
+                #Check if OS Upgrade eligible field is set
+                #If not add the field
+                #Note if it's false, we will still try because it could have been errantly set as false.
+                if($eligibleAT.value -ne 'true'){
+                    $NCDeviceServices = Get-NcentralDeviceServicesMonitoring -DeviceId $NCid.Value
+                    $service = $NCDeviceServices|?{$_.moduleName -eq 'Windows 11 Eligible'}
+                    if($null -ne $NCDeviceServices.data -and $null -eq $service){
+                        $service = $NCDeviceServices.data|?{$_.moduleName -eq 'Windows 11 Eligible'}
+                    }
+
+                    $eligibleNC = $(if($service.stateStatus -eq 'Normal'){'true'} elseif($service.stateStatus -eq 'Failed'){'false'} else {''})
+
+                    if($eligibleNC -eq 'true' -or $eligibleNC -eq 'false' -and $eligibleAT -ne 'true'){
+                        $body.userDefinedFields.add([pscustomobject]@{"name" = "OS Upgrade Eligible"; "value" = $eligibleNC})|Out-Null
+                    }
+                }
+
+                $q = Set-AutotaskAPIResource -Resource ConfigurationItemExts -ID $ATDevice.id -body $body
             }
-
-            $q = Set-AutotaskAPIResource -Resource ConfigurationItemExts -ID $ATDevice.id -body $body
+            catch {
+                Write-Host "Meh $($ATDevice.referenceTitle) failed to get NCentral details."
+            }
         }
 
         Write-LogMessage -user "CIPP" -API $APIName -tenant "None" -Message "Updated $($ATDevices.Count) devices" -Sev "Info"
