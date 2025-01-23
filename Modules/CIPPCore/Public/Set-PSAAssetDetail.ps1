@@ -102,7 +102,6 @@ function Set-PSAAssetDetail {
 
         Get-AutotaskToken -configuration $Configuration.Autotask
         $ncJWT = Get-NCentralJWT
-        New-NCentralConnection -ServerFQDN $Configuration.NCentral.ApiHost -JWT $ncJWT
         Connect-Ncentral -ApiHost $Configuration.NCentral.ApiHost -key ($ncJWT|ConvertTo-SecureString -AsPlainText -Force)
 
         $ATDevices = Get-AutotaskAPIResource -Resource ConfigurationItems -SearchQuery $query
