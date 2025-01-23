@@ -45,8 +45,7 @@ function Set-PSAAssetDetail {
             return "No PSA client matching filter."
         }
 
-        Write-LogMessage -user "CIPP" -API $APIName -tenant $TenantFilter -Message "Using $($TenantFilter) for filetering managed companies.."  -Sev "Info"
-        Write-LogMessage -user "CIPP" -API $APIName -tenant "None" -Message "Got $($managedCompanies.ManagedCusts.Count) managed companies."  -Sev "Info"
+        Write-LogMessage -user "CIPP" -API $APIName -tenant $TenantFilter -Message "Updating $($TenantFilter) devices."  -Sev "Info"
 
         #Get all AT Configuration Items of type workstation, that are active, that have the "N-central Device ID [UDF]" property set, and Managed for the Client
         #Get-AutotaskAPIResource -Resource ConfigurationItemTypes -SimpleSearch "isactive eq $true "
@@ -142,11 +141,11 @@ function Set-PSAAssetDetail {
                 $q = Set-AutotaskAPIResource -Resource ConfigurationItemExts -ID $ATDevice.id -body $body
             }
             catch {
-                Write-Host "Meh $($ATDevice.referenceTitle) failed to get NCentral details."
+                Write-LogMessage -user "CIPP" -API $APIName -tenant "$($TenantFilter)" -Message "Failed to get NCentral details for Autotask device: $($ATDevice.referenceTitle)" -Sev 'Error'
             }
         }
 
-        Write-LogMessage -user "CIPP" -API $APIName -tenant "None" -Message "Updated $($ATDevices.Count) devices" -Sev "Info"
+        Write-LogMessage -user "CIPP" -API $APIName -tenant "$($TenantFilter)" -Message "Updated $($ATDevices.Count) devices" -Sev "Info"
         return "Updated $($ATDevices.Count) devices"
     } catch {
         Write-LogMessage -user "CIPP" -API $APINAME -tenant "None" -message "Failed to set PSA Asset Detail. Error:$($_.Exception.Message)" -Sev 'Error'
