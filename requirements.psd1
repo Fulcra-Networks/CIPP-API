@@ -8,5 +8,5 @@
     'Az.Keyvault'   = '3.*'
     'AzBobbyTables' = '2.*'
     'AutoTaskAPI'   = '1.*'
-    'NCentralRest'   = '1.*'
+    'NCentralRest'  = '1.*'
 }

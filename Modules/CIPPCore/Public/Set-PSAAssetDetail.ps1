@@ -108,7 +108,7 @@ function Set-PSAAssetDetail {
         foreach ($ATDevice in $ATDevices){
             try{
                 $NCid = $ATDevice.userDefinedFields | Where-Object {$_.Name -eq 'N-central Device ID'}
-                $eligibleAT = $ATDevice.userDefinedFields|?{$_.Name -eq 'OS Upgrade Eligible'}
+                $eligibleAT = $ATDevice.userDefinedFields | Where-Object {$_.Name -eq 'OS Upgrade Eligible'}
 
                 $NCDevice = Get-NCentralDeviceDetail -DeviceId $NCid.Value
 
@@ -126,9 +126,9 @@ function Set-PSAAssetDetail {
                 #Note if it's false, we will still try because it could have been errantly set as false.
                 if($eligibleAT.value -ne 'true'){
                     $NCDeviceServices = Get-NcentralDeviceServicesMonitoring -DeviceId $NCid.Value
-                    $service = $NCDeviceServices|?{$_.moduleName -eq 'Windows 11 Eligible'}
+                    $service = $NCDeviceServices | Where-Object {$_.moduleName -eq 'Windows 11 Eligible'}
                     if($null -ne $NCDeviceServices.data -and $null -eq $service){
-                        $service = $NCDeviceServices.data|?{$_.moduleName -eq 'Windows 11 Eligible'}
+                        $service = $NCDeviceServices.data | Where-Object {$_.moduleName -eq 'Windows 11 Eligible'}
                     }
 
                     $eligibleNC = $(if($service.stateStatus -eq 'Normal'){'true'} elseif($service.stateStatus -eq 'Failed'){'false'} else {''})
@@ -138,10 +138,10 @@ function Set-PSAAssetDetail {
                     }
                 }
 
-                $q = Set-AutotaskAPIResource -Resource ConfigurationItemExts -ID $ATDevice.id -body $body
+                Set-AutotaskAPIResource -Resource ConfigurationItemExts -ID $ATDevice.id -body $body|Out-Null
             }
             catch {
-                Write-LogMessage -user "CIPP" -API $APIName -tenant "$($TenantFilter)" -Message "Failed to get NCentral details for Autotask device: $($ATDevice.referenceTitle)" -Sev 'Error'
+                Write-LogMessage -user "CIPP" -API $APIName -tenant "$($TenantFilter)" -Message "Error updating device: $($ATDevice.referenceTitle) - $($_.Exception.Message)" -Sev 'Error'
             }
         }
 
@@ -163,6 +163,5 @@ function Get-NCentralJWT {
         $ClientSecret = $ENV:NCentralJWT
     }
 
-    #Write-LogMessage -user "CIPP" -API $APIName -tenant "None" -Message "Got NCentral api key $($ClientSecret.substring(0,5))..."  -Sev "Info"
     return $ClientSecret
 }
