@@ -10,8 +10,8 @@ Function Invoke-ListExtensionSync {
     [CmdletBinding()]
     param($Request, $TriggerMetadata)
 
-    $APIName = $TriggerMetadata.FunctionName
-    Write-LogMessage -user $request.headers.'x-ms-client-principal' -API $APINAME -message 'Accessed this API' -Sev 'Debug'
+    $APIName = $Request.Params.CIPPEndpoint
+    Write-LogMessage -headers $Request.Headers -API $APINAME -message 'Accessed this API' -Sev 'Debug'
 
     # Write to the Azure Functions log stream.
     Write-Host 'PowerShell HTTP trigger function processed a request.'
@@ -50,10 +50,9 @@ Function Invoke-ListExtensionSync {
             $AllTasksArrayList.Add($TaskEntry)
         }
     }
-    Write-Host ($AllTasksArrayList | ConvertTo-Json -Depth 5 -Compress)
-    # Associate values to output bindings by calling 'Push-OutputBinding'.
+
     Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
             StatusCode = [HttpStatusCode]::OK
-            Body       = ConvertTo-Json -Depth 5 -InputObject $($AllTasksArrayList)
+            Body       = ConvertTo-Json -Depth 5 -InputObject @($AllTasksArrayList)
         })
 }

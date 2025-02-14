@@ -5,32 +5,35 @@ function Invoke-CIPPStandardIntuneComplianceSettings {
     .COMPONENT
         (APIName) IntuneComplianceSettings
     .SYNOPSIS
-        (Label) InTune Compliance settings
+        (Label) Set Intune Compliance Settings
     .DESCRIPTION
         (Helptext) Sets the mark devices with no compliance policy assigned as compliance/non compliant and Compliance status validity period.
         (DocsDescription) Sets the mark devices with no compliance policy assigned as compliance/non compliant and Compliance status validity period.
     .NOTES
         CAT
-            InTune Standards
+            Intune Standards
         TAG
             "lowimpact"
         ADDEDCOMPONENT
+            {"type":"autoComplete","multiple":false,"name":"standards.IntuneComplianceSettings.secureByDefault","label":"Mark devices with no compliance policy as","options":[{"label":"Compliant","value":"false"},{"label":"Non-Compliant","value":"true"}]}
+            {"type":"number","name":"standards.IntuneComplianceSettings.deviceComplianceCheckinThresholdDays","label":"Compliance status validity period (days)"}
         IMPACT
             Low Impact
+        POWERSHELLEQUIVALENT
+
         RECOMMENDEDBY
         UPDATECOMMENTBLOCK
             Run the Tools\Update-StandardsComments.ps1 script to update this comment block
     .LINK
-        https://docs.cipp.app/user-documentation/tenant/standards/edit-standards
+        https://docs.cipp.app/user-documentation/tenant/standards/list-standards/intune-standards#low-impact
     #>
 
     param($Tenant, $Settings)
 
     $CurrentState = New-GraphGetRequest -Uri 'https://graph.microsoft.com/beta/deviceManagement/settings' -tenantid $Tenant
 
-    if ($null -eq $Settings.secureByDefault) { $Settings.secureByDefault = $true }
     if ($null -eq $Settings.deviceComplianceCheckinThresholdDays) { $Settings.deviceComplianceCheckinThresholdDays = $CurrentState.deviceComplianceCheckinThresholdDays }
-    $StateIsCorrect =   ($CurrentState.secureByDefault -eq $Settings.secureByDefault) -and
+    $StateIsCorrect =   ($CurrentState.secureByDefault -eq $Settings.secureByDefault.value) -and
                         ($CurrentState.deviceComplianceCheckinThresholdDays -eq $Settings.deviceComplianceCheckinThresholdDays)
 
     if ($Settings.remediate -eq $true) {
@@ -46,7 +49,7 @@ function Invoke-CIPPStandardIntuneComplianceSettings {
                     ContentType = 'application/json; charset=utf-8'
                     Body        = [pscustomobject]@{
                         settings = [pscustomobject]@{
-                            secureByDefault = $Settings.secureByDefault
+                            secureByDefault = $Settings.secureByDefault.value
                             deviceComplianceCheckinThresholdDays = $Settings.deviceComplianceCheckinThresholdDays
                         }
                     } | ConvertTo-Json -Compress

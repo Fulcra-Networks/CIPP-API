@@ -10,8 +10,8 @@ Function Invoke-ListExConnectorTemplates {
     [CmdletBinding()]
     param($Request, $TriggerMetadata)
 
-    $APIName = $TriggerMetadata.FunctionName
-    Write-LogMessage -user $request.headers.'x-ms-client-principal' -API $APINAME -message 'Accessed this API' -Sev 'Debug'
+    $APIName = $Request.Params.CIPPEndpoint
+    Write-LogMessage -headers $Request.Headers -API $APINAME -message 'Accessed this API' -Sev 'Debug'
     $Table = Get-CippTable -tablename 'templates'
 
     #List new policies
@@ -21,8 +21,8 @@ Function Invoke-ListExConnectorTemplates {
         $GUID = $_.RowKey
         $Direction = $_.direction
         $data = $_.JSON | ConvertFrom-Json
-        $data | Add-Member -NotePropertyName 'GUID' -NotePropertyValue $GUID
-        $data | Add-Member -NotePropertyName 'cippconnectortype' -NotePropertyValue $Direction
+        $data | Add-Member -NotePropertyName 'GUID' -NotePropertyValue $GUID -Force
+        $data | Add-Member -NotePropertyName 'cippconnectortype' -NotePropertyValue $Direction -Force
         $data
     } | Sort-Object -Property displayName
 

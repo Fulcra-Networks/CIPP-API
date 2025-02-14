@@ -3,12 +3,13 @@ function New-CIPPUserTask {
     param (
         $userobj,
         $APIName = 'New User Task',
-        $ExecutingUser
+        $TenantFilter,
+        $Headers
     )
     $Results = [System.Collections.Generic.List[string]]::new()
 
     try {
-        $CreationResults = New-CIPPUser -userobj $UserObj -APIName $APINAME -ExecutingUser $request.headers.'x-ms-client-principal'
+        $CreationResults = New-CIPPUser -userobj $UserObj -APIName $APINAME -Headers $Headers
         $results.add('Created New User.')
         $results.add("Username: $($CreationResults.username)")
         $results.add("Password: $($CreationResults.password)")
@@ -18,33 +19,33 @@ function New-CIPPUserTask {
     }
 
     try {
-        $licenses = (($UserObj | Select-Object 'License_*').psobject.properties | Where-Object { $_.value -EQ $true }).name -replace 'License_', ''
-        if ($licenses) {
-            $LicenseResults = Set-CIPPUserLicense -userid $CreationResults.username -TenantFilter $UserObj.tenantID -Licenses $licenses
+        if ($userobj.licenses.value) {
+            $LicenseResults = Set-CIPPUserLicense -UserId $CreationResults.username -TenantFilter $UserObj.tenantFilter -AddLicenses $UserObj.licenses.value -Headers $Headers
             $Results.Add($LicenseResults)
         }
     } catch {
-        Write-LogMessage -user $request.headers.'x-ms-client-principal' -API $APINAME -tenant $($userobj.tenantID) -message "Failed to assign the license. Error:$($_.Exception.Message)" -Sev 'Error'
+        Write-LogMessage -headers $Headers -API $APINAME -tenant $($userobj.tenantFilter) -message "Failed to assign the license. Error:$($_.Exception.Message)" -Sev 'Error'
         $body = $results.add("Failed to assign the license. $($_.Exception.Message)")
     }
 
     try {
         if ($Userobj.AddedAliases) {
-            $AliasResults = Add-CIPPAlias -user $CreationResults.username -Aliases ($UserObj.AddedAliases -split '\s') -UserprincipalName $CreationResults.Username -TenantFilter $UserObj.tenantID -APIName $APINAME -ExecutingUser $request.headers.'x-ms-client-principal'
+            $AliasResults = Add-CIPPAlias -user $CreationResults.username -Aliases ($UserObj.AddedAliases -split '\s') -UserprincipalName $CreationResults.Username -TenantFilter $UserObj.tenantFilter -APIName $APINAME -Headers $Headers
             $results.add($AliasResults)
         }
     } catch {
-        Write-LogMessage -user $request.headers.'x-ms-client-principal' -API $APINAME -tenant $($userobj.tenantID) -message "Failed to create the Aliases. Error:$($_.Exception.Message)" -Sev 'Error'
+        Write-LogMessage -headers $Headers -API $APINAME -tenant $($userobj.tenantFilter) -message "Failed to create the Aliases. Error:$($_.Exception.Message)" -Sev 'Error'
         $body = $results.add("Failed to create the Aliases: $($_.Exception.Message)")
     }
-    if ($userobj.CopyFrom -ne '') {
-        $CopyFrom = Set-CIPPCopyGroupMembers -ExecutingUser $request.headers.'x-ms-client-principal' -CopyFromId $userObj.CopyFrom -UserID $CreationResults.Username -TenantFilter $UserObj.tenantID
+    if ($userobj.copyFrom.value) {
+        Write-Host "Copying from $($userObj.copyFrom.value)"
+        $CopyFrom = Set-CIPPCopyGroupMembers -Headers $Headers -CopyFromId $userObj.copyFrom.value -UserID $CreationResults.Username -TenantFilter $UserObj.tenantFilter
         $CopyFrom.Success | ForEach-Object { $results.Add($_) }
         $CopyFrom.Error | ForEach-Object { $results.Add($_) }
     }
 
     if ($userobj.setManager) {
-        $ManagerResult = Set-CIPPManager -user $CreationResults.username -Manager $userObj.setManager.value -TenantFilter $UserObj.tenantID -APIName 'Set Manager' -ExecutingUser $request.headers.'x-ms-client-principal'
+        $ManagerResult = Set-CIPPManager -user $CreationResults.username -Manager $userObj.setManager.value -TenantFilter $UserObj.tenantFilter -APIName 'Set Manager' -Headers $Headers
         $results.add($ManagerResult)
     }
 

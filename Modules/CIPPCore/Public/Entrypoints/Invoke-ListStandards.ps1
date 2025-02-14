@@ -10,8 +10,8 @@ Function Invoke-ListStandards {
     [CmdletBinding()]
     param($Request, $TriggerMetadata)
 
-    $APIName = $TriggerMetadata.FunctionName
-    Write-LogMessage -user $request.headers.'x-ms-client-principal' -API $APINAME -message 'Accessed this API' -Sev 'Debug'
+    $APIName = $Request.Params.CIPPEndpoint
+    Write-LogMessage -headers $Request.Headers -API $APINAME -message 'Accessed this API' -Sev 'Debug'
 
     if ($Request.Query.ShowConsolidated -eq $true) {
         $StandardQuery = @{
@@ -40,14 +40,6 @@ Function Invoke-ListStandards {
                 appliedAt       = $tenant.appliedAt
                 standards       = $tenant.Standards
                 StandardsExport = ($tenant.Standards.psobject.properties.name) -join ', '
-            }
-        }
-        if (!$CurrentStandards) {
-            $CurrentStandards = [PSCustomObject]@{
-                displayName = 'No Standards applied'
-                appliedBy   = $null
-                appliedAt   = $null
-                standards   = @{none = $null }
             }
         }
 

@@ -10,6 +10,10 @@ function Receive-CippHttpTrigger {
         $TriggerMetadata
     )
 
+    if ($Request.Headers.'x-ms-coldstart' -eq 1) {
+        Write-Information '** Function app cold start detected **'
+    }
+
     $ConfigTable = Get-CIPPTable -tablename Config
     $Config = Get-CIPPAzDataTableEntity @ConfigTable -Filter "PartitionKey eq 'OffloadFunctions' and RowKey eq 'OffloadFunctions'"
 
@@ -208,7 +212,7 @@ function Receive-CIPPTimerTrigger {
 
     foreach ($Function in $Functions) {
         Write-Information "CIPPTimer: $($Function.Command) - $($Function.Cron)"
-        $FunctionStatus = $Statuses | Where-Object { $_.RowKey -eq $Function.Command }
+        $FunctionStatus = $Statuses | Where-Object { $_.RowKey -eq $Function.Id }
         if ($FunctionStatus.OrchestratorId) {
             $FunctionName = $env:WEBSITE_SITE_NAME
             $InstancesTable = Get-CippTable -TableName ('{0}Instances' -f ($FunctionName -replace '-', ''))
@@ -223,7 +227,13 @@ function Receive-CIPPTimerTrigger {
             if ($FunctionStatus.PSObject.Properties.Name -contains 'ErrorMsg') {
                 $FunctionStatus.ErrorMsg = ''
             }
-            $Results = Invoke-Command -ScriptBlock { & $Function.Command }
+
+            $Parameters = @{}
+            if ($Function.Parameters) {
+                $Parameters = $Function.Parameters | ConvertTo-Json | ConvertFrom-Json -AsHashtable
+            }
+
+            $Results = Invoke-Command -ScriptBlock { & $Function.Command @Parameters }
             if ($Results -match '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$') {
                 $FunctionStatus.OrchestratorId = $Results
                 $Status = 'Started'

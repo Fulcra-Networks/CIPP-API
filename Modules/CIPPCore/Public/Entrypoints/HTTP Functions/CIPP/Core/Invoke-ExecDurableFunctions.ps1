@@ -9,7 +9,7 @@ function Invoke-ExecDurableFunctions {
     param($Request, $TriggerMetadata)
 
     $APIName = 'ExecDurableStats'
-    Write-LogMessage -user $request.headers.'x-ms-client-principal' -API $APINAME -message 'Accessed this API' -Sev 'Debug'
+    Write-LogMessage -headers $Request.Headers -API $APINAME -message 'Accessed this API' -Sev 'Debug'
 
     # Collect info
     $StorageContext = New-AzStorageContext -ConnectionString $env:AzureWebJobsStorage
@@ -95,7 +95,7 @@ function Invoke-ExecDurableFunctions {
                     if ($PSCmdlet.ShouldProcess('Orchestrators', 'Mark Failed')) {
                         foreach ($Instance in $RunningInstances) {
                             $Instance.RuntimeStatus = 'Failed'
-                            Update-AzDataTableEntity @InstancesTable -Entity $Instance
+                            Update-AzDataTableEntity -Force @InstancesTable -Entity $Instance
                         }
                     }
                 }
@@ -110,7 +110,7 @@ function Invoke-ExecDurableFunctions {
                 }
                 if (($QueueEntities | Measure-Object).Count -gt 0) {
                     if ($PSCmdlet.ShouldProcess('Queues', 'Mark Failed')) {
-                        Update-AzDataTableEntity @QueueTable -Entity $QueueEntities
+                        Update-AzDataTableEntity -Force @QueueTable -Entity $QueueEntities
                     }
                 }
 
@@ -122,7 +122,7 @@ function Invoke-ExecDurableFunctions {
                             $Task.Status = 'Failed'
                             $Task
                         }
-                        Update-AzDataTableEntity @CippQueueTasks -Entity $UpdatedTasks
+                        Update-AzDataTableEntity -Force @CippQueueTasks -Entity $UpdatedTasks
                     }
                 }
 

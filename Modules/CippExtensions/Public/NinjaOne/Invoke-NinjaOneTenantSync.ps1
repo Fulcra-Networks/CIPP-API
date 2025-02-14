@@ -45,7 +45,7 @@ function Invoke-NinjaOneTenantSync {
         $Customer = Get-Tenants -IncludeErrors | Where-Object { $_.customerId -eq $MappedTenant.RowKey }
         Write-Information "Processing: $($Customer.displayName) - Queued for $((New-TimeSpan -Start $StartQueueTime -End $StartTime).TotalSeconds)"
 
-        Write-LogMessage -API 'NinjaOneSync' -user 'NinjaOneSync' -message "Processing NinjaOne Synchronization for $($Customer.displayName) - Queued for $((New-TimeSpan -Start $StartQueueTime -End $StartTime).TotalSeconds)" -Sev 'Info'
+        Write-LogMessage -API 'NinjaOneSync' -Headers'NinjaOneSync' -message "Processing NinjaOne Synchronization for $($Customer.displayName) - Queued for $((New-TimeSpan -Start $StartQueueTime -End $StartTime).TotalSeconds)" -Sev 'Info'
 
         if (($Customer | Measure-Object).count -ne 1) {
             Throw "Unable to match the recieved ID to a tenant QueueItem: $($QueueItem | ConvertTo-Json -Depth 100 | Out-String) Matched Customer: $($Customer| ConvertTo-Json -Depth 100 | Out-String)"
@@ -763,7 +763,7 @@ function Invoke-NinjaOneTenantSync {
                     $DeviceLinksData = @(
                         @{
                             Name = 'Entra ID'
-                            Link = "https://entra.microsoft.com/$($Customer.defaultDomainName)/#view/Microsoft_AAD_Devices/DeviceDetailsMenuBlade/~/Properties/deviceId/$($Device.azureADDeviceId)/deviceId/"
+                            Link = "https://entra.microsoft.com/$($Customer.defaultDomainName)/#view/Microsoft_AAD_Devices/DeviceDetailsMenuBlade/~/Properties/deviceId/$($Device.azureADDeviceId)"
                             Icon = 'fab fa-microsoft'
                         },
                         @{
@@ -773,7 +773,7 @@ function Invoke-NinjaOneTenantSync {
                         },
                         @{
                             Name = 'View Devices in CIPP'
-                            Link = "https://$($CIPPURL)/endpoint/reports/devices?customerId=$($Customer.defaultDomainName)"
+                            Link = "https://$($CIPPURL)/endpoint/MEM/devices?customerId=$($Customer.defaultDomainName)"
                             Icon = 'far fa-eye'
                         }
                     )
@@ -886,7 +886,7 @@ function Invoke-NinjaOneTenantSync {
 
         # Enable Device Updates Subscription if needed.
         if ($MappedFields.DeviceCompliance) {
-            New-CIPPGraphSubscription -TenantFilter $TenantFilter -TypeofSubscription 'updated' -BaseURL $CIPPUrl -Resource 'devices' -EventType 'DeviceUpdate' -ExecutingUser 'NinjaOneSync'
+            New-CIPPGraphSubscription -TenantFilter $TenantFilter -TypeofSubscription 'updated' -BaseURL $CIPPUrl -Resource 'devices' -EventType 'DeviceUpdate' -Headers 'NinjaOneSync'
         }
 
         Write-Information 'Processed Devices'
@@ -1748,7 +1748,7 @@ function Invoke-NinjaOneTenantSync {
                 },
                 @{
                     Name = 'Compliance Portal'
-                    Link = "https://compliance.microsoft.com/?tid=$($Customer.CustomerId)"
+                    Link = "https://purview.microsoft.com/?tid=$($Customer.CustomerId)"
                     Icon = 'fas fa-user-shield'
                 },
                 @{
@@ -1785,7 +1785,7 @@ function Invoke-NinjaOneTenantSync {
                 },
                 @{
                     Name = 'List Devices'
-                    Link = "https://$CIPPUrl/endpoint/reports/devices?customerId=$($Customer.customerId)"
+                    Link = "https://$CIPPUrl/endpoint/MEM/devices?customerId=$($Customer.customerId)"
                     Icon = 'fas fa-laptop'
                 },
                 @{
@@ -1963,7 +1963,7 @@ function Invoke-NinjaOneTenantSync {
 
             # Create the Devices Card
 
-            $TitleLink = "https://$CIPPUrl/endpoint/reports/devices?customerId=$($Customer.customerId)"
+            $TitleLink = "https://$CIPPUrl/endpoint/MEM/devices?customerId=$($Customer.customerId)"
 
             $DeviceCardBodyHTML = $DeviceComplianceChartHTML + $DeviceOsChartHTML + $DeviceOnlineChartHTML
 
@@ -2175,7 +2175,7 @@ function Invoke-NinjaOneTenantSync {
                     Value       = ($Devices | Measure-Object).count
                     Description = 'Devices'
                     Colour      = '#CCCCCC'
-                    Link        = "https://$CIPPUrl/endpoint/reports/devices?customerId=$($Customer.customerId)"
+                    Link        = "https://$CIPPUrl/endpoint/MEM/devices?customerId=$($Customer.customerId)"
                 })
 
             # Groups
@@ -2326,7 +2326,7 @@ function Invoke-NinjaOneTenantSync {
         $CurrentItem | Add-Member -NotePropertyName lastStatus -NotePropertyValue 'Completed' -Force
         Add-CIPPAzDataTableEntity @MappingTable -Entity $CurrentItem -Force
 
-        Write-LogMessage -API 'NinjaOneSync' -user 'NinjaOneSync' -message "Completed NinjaOne Sync for $($Customer.displayName). Queued for $((New-TimeSpan -Start $StartQueueTime -End $StartTime).TotalSeconds) seconds. Data fetched in $((New-TimeSpan -Start $StartTime -End $FetchEnd).TotalSeconds) seconds. Total processing time $((New-TimeSpan -Start $StartTime -End (Get-Date)).TotalSeconds) seconds" -Sev 'info'
+        Write-LogMessage -API 'NinjaOneSync' -Headers'NinjaOneSync' -message "Completed NinjaOne Sync for $($Customer.displayName). Queued for $((New-TimeSpan -Start $StartQueueTime -End $StartTime).TotalSeconds) seconds. Data fetched in $((New-TimeSpan -Start $StartTime -End $FetchEnd).TotalSeconds) seconds. Total processing time $((New-TimeSpan -Start $StartTime -End (Get-Date)).TotalSeconds) seconds" -Sev 'info'
 
     } catch {
         $Message = if ($_.ErrorDetails.Message) {
@@ -2335,7 +2335,7 @@ function Invoke-NinjaOneTenantSync {
             $_.Exception.message
         }
         Write-Error "Failed NinjaOne Processing for $($Customer.displayName) Linenumber: $($_.InvocationInfo.ScriptLineNumber) Error:  $Message"
-        Write-LogMessage -API 'NinjaOneSync' -user 'NinjaOneSync' -message "Failed NinjaOne Processing for $($Customer.displayName) Linenumber: $($_.InvocationInfo.ScriptLineNumber) Error: $Message" -Sev 'Error'
+        Write-LogMessage -API 'NinjaOneSync' -Headers'NinjaOneSync' -message "Failed NinjaOne Processing for $($Customer.displayName) Linenumber: $($_.InvocationInfo.ScriptLineNumber) Error: $Message" -Sev 'Error'
         $CurrentItem | Add-Member -NotePropertyName lastEndTime -NotePropertyValue ([string]$((Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ss.fffZ'))) -Force
         $CurrentItem | Add-Member -NotePropertyName lastStatus -NotePropertyValue 'Failed' -Force
         Add-CIPPAzDataTableEntity @MappingTable -Entity $CurrentItem -Force
