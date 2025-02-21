@@ -53,13 +53,16 @@ Function Invoke-ExecExtensionTest {
                 }
             }
             "IronScales" {
-                  $token = Get-IronScalesToken -configuration $Configuration.IronScales
-                  $Results = [pscustomobject]@{"Results" = "Succesfully Connected to IronScales" }
+                $token = Get-IronScalesToken -configuration $Configuration.IronScales
+                $Results = [pscustomobject]@{ "Results" = "Succesfully Connected to IronScales" }
             }
             "Autotask" {
-                  Write-Host "Testing Autotask integration...."
-                  $token = Get-AutotaskToken -configuration $Configuration.Autotask
-                  $Results = [pscustomobject]@{"Results" = "Succesfully Connected to Autotask" }
+                $token = Get-AutotaskToken -configuration $Configuration.Autotask
+                $Results = [pscustomobject]@{ "Results" = "Succesfully Connected to Autotask" }
+            }
+            "NCentral" {
+                $token = ""
+                $Results = [pscustomobject]@{ "Results" = "Succesfully Connected to NCentral" }
             }
             'PWPush' {
                 $Payload = 'This is a test from CIPP'

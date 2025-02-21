@@ -68,19 +68,15 @@ Function Invoke-ExecExtensionMapping {
                 'Autotask' {
                     $Body = Set-AutotaskMapping -CIPPMapping $Table -APIName $APIName -Request $Request
                 }
-
                 'AutotaskManaged' {
                     $Body = Set-AutotaskManaged -CIPPMapping $Table -APIName $APIName -Request $Request
                 }
-
                 'IronScales' {
                     $Body = Set-IronScalesMapping -CIPPMapping $Table -APIName $APIName -Request $Request
                 }
-
                 'Sherweb' {
                     $Body = Set-SherwebMapping -CIPPMapping $Table -APIName $APIName -Request $Request
                 }
-
                 'HaloPSA' {
                     $body = Set-HaloMapping -CIPPMapping $Table -APIName $APIName -Request $Request
                 }
