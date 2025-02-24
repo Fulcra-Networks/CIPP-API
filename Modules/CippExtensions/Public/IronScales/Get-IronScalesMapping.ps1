@@ -3,13 +3,22 @@ function Get-IronScalesMapping {
     param (
         $CIPPMapping
     )
+
     #Get available mappings
     $Mappings = [pscustomobject]@{}
+    $Tenants = Get-Tenants -IncludeErrors
 
-    $Filter = "PartitionKey eq 'Mapping'"
-    Get-CIPPAzDataTableEntity @CIPPMapping -Filter $Filter | ForEach-Object {
-        if($null -ne $_.IronScalesName -and "" -ne $_.IronScalesName){
-            $Mappings | Add-Member -NotePropertyName $_.RowKey -NotePropertyValue @{ label = "$($_.IronScalesName)"; value = "$($_.IronScalesId)" }
+    $ExtensionMappings = Get-ExtensionMapping -Extension 'IronScales'
+    $Mappings = foreach ($Mapping in $ExtensionMappings) {
+        $Tenant = $Tenants | Where-Object { $_.RowKey -eq $Mapping.RowKey }
+        if ($Tenant) {
+            [PSCustomObject]@{
+                TenantId        = $Tenant.customerId
+                Tenant          = $Tenant.displayName
+                TenantDomain    = $Tenant.defaultDomainName
+                IntegrationId   = $Mapping.IntegrationId
+                IntegrationName = $Mapping.IntegrationName
+            }
         }
     }
 
@@ -39,12 +48,9 @@ function Get-IronScalesMapping {
         }
     }
 
-    $Tenants = Get-Tenants
-
     $MappingObj = [PSCustomObject]@{
-        Tenants     = @($Tenants)
         Companies   = @($IronScalesCompanies)
-        Mappings    = $Mappings
+        Mappings    = @($Mappings)
     }
 
     return $MappingObj
