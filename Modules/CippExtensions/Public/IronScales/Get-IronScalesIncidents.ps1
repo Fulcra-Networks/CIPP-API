@@ -18,7 +18,10 @@ function New-IronScalestickets {
     }
 
     $MappingTable = Get-CIPPTable -TableName CippMapping
-    $MappingFile = (Get-CIPPAzDataTableEntity @MappingTable)
+
+    $ATMappings = Get-ExtensionMapping -Extension 'Autotask'
+    $ISMappings = Get-ExtensionMapping -Extension 'IronScales'
+
     $Table = Get-CIPPTable -TableName Extensionsconfig
     $Configuration = (Get-CIPPAzDataTableEntity @Table).config | ConvertFrom-Json -Depth 10
 
@@ -27,23 +30,15 @@ function New-IronScalestickets {
             "Autotask" {
                 If ($Configuration.Autotask.enabled) {
                     Write-LogMessage -API 'IronScales' -tenant 'none' -message 'Autotask is enabled. Sending IronScales tickets.' -Sev Info
-
                     Get-AutotaskToken -configuration $Configuration.Autotask
 
-                    $managed_issues_body = @()
-
                     foreach($company in $IronScalesIncidents) {
-                        $AtCompany = $MappingFile | Where-Object { $_.IronScalesId -eq $company.Id }
+                        $ISCompany = $ISMappings | Where-Object { $_.IntegrationId -eq $company.Id }
+                        $AtCompany = $ATMappings | Where-Object { $_.RowKey -eq $ISCompany.RowKey }
 
-                        if($company.companyName -eq 'Fulcra Networks'){
-                            $managed_issues_body += Get-BodyForTicket $company
-                        }
-                        elseif($null -eq $AtCompany){
+                        if($null -eq $AtCompany){
                             Write-LogMessage -API 'IronScales' -tenant 'none' -message "IronScales company $($company.customername) is not mapped." -Sev Info
                             continue
-                        }
-                        elseif($AtCompany.IsManaged) {
-                            $managed_issues_body += Get-BodyForTicket $company
                         }
                         else {
                             Write-LogMessage -API 'IronScales' -tenant 'none' -message "Creating Autotask ticket for IronScales company $($company.customername)" -Sev Info
@@ -53,7 +48,6 @@ function New-IronScalestickets {
                                 Write-LogMessage -API 'IronScales' -tenant 'none' -message "An existing Autotask ticket was found for $($company.customername)" -Sev Info
                                 continue
                             }
-
 
                             $body = Get-BodyForTicket $company
                             $estHr = 0.1*$company.Incidents.Count
@@ -66,23 +60,6 @@ function New-IronScalestickets {
                                 -subIssueType "323"
 
                         }
-                    }
-                    if($managed_issues_body.Count -ne 0){
-                        Write-LogMessage -API 'IronScales' -tenant 'none' -message "Creating Autotask ticket for managed companies" -Sev Info
-                        $mTitle = "[IronScales-Managed] New Incident(s)"
-
-                        if(Get-ExistingTicket $mTitle){
-                            Write-LogMessage -API 'IronScales' -tenant 'none' -message "An existing Autotask ticket was found for managed companies" -Sev Info
-                            continue
-                        }
-
-                        New-AutotaskTicket -atCompany 0 `
-                            -title $mTitle `
-                            -description ($managed_issues_body|Join-String) `
-                            -issueType "29" `
-                            -priority "1" `
-                            -subIssueType "323"
-
                     }
                 }
             }

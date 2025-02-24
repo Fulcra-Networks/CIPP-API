@@ -10,7 +10,7 @@ Function Invoke-ExecSetCIPPAutoBackup {
     [CmdletBinding()]
     param($Request, $TriggerMetadata)
     $unixtime = [int64](([datetime]::UtcNow) - (Get-Date '1/1/1970')).TotalSeconds
-    if ($Request.query.Enabled -eq 'True') {
+    if ($Request.Body.Enabled -eq 'True') {
         $Table = Get-CIPPTable -TableName 'ScheduledTasks'
         $AutomatedCIPPBackupTask = Get-AzDataTableEntity @table -Filter "Name eq 'Automated CIPP Backup'"
         $task = @{
@@ -20,7 +20,7 @@ Function Invoke-ExecSetCIPPAutoBackup {
         Remove-AzDataTableEntity -Force @Table -Entity $task | Out-Null
 
         $TaskBody = [pscustomobject]@{
-            TenantFilter  = 'AllTenants'
+            TenantFilter  = 'PartnerTenant'
             Name          = 'Automated CIPP Backup'
             Command       = @{
                 value = 'New-CIPPBackup'
@@ -33,7 +33,7 @@ Function Invoke-ExecSetCIPPAutoBackup {
         Add-CIPPScheduledTask -Task $TaskBody -hidden $false
         $Result = @{ 'Results' = 'Scheduled Task Successfully created' }
     }
-    Write-LogMessage -user $request.headers.'x-ms-client-principal' -API 'Alerts' -message $request.body.text -Sev $request.body.Severity
+    Write-LogMessage -headers $Request.Headers -API $Request.Params.CIPPEndpoint -message 'Scheduled automatic CIPP backups' -Sev 'Info'
     # Associate values to output bindings by calling 'Push-OutputBinding'.
     Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
             StatusCode = [HttpStatusCode]::OK

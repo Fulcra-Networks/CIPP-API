@@ -10,8 +10,8 @@ Function Invoke-ExecExtensionMapping {
     [CmdletBinding()]
     param($Request, $TriggerMetadata)
 
-    $APIName = $TriggerMetadata.FunctionName
-    Write-LogMessage -user $request.headers.'x-ms-client-principal' -API $APINAME -message 'Accessed this API' -Sev 'Debug'
+    $APIName = $Request.Params.CIPPEndpoint
+    Write-LogMessage -headers $Request.Headers -API $APINAME -message 'Accessed this API' -Sev 'Debug'
 
     # Write to the Azure Functions log stream.
     Write-Host 'PowerShell HTTP trigger function processed a request.'
@@ -46,6 +46,19 @@ Function Invoke-ExecExtensionMapping {
             'HuduFields' {
                 $Body = Get-HuduFieldMapping -CIPPMapping $Table
             }
+            'Sherweb' {
+                $Body = Get-SherwebMapping -CIPPMapping $Table
+            }
+            'HaloPSAFields' {
+                $TicketTypes = Get-HaloTicketType
+                $Body = @{'TicketTypes' = $TicketTypes }
+            }
+            'PWPushFields' {
+                $Accounts = Get-PwPushAccount
+                $Body = @{
+                    'Accounts' = $Accounts
+                }
+            }
         }
     }
 
@@ -55,15 +68,15 @@ Function Invoke-ExecExtensionMapping {
                 'Autotask' {
                     $Body = Set-AutotaskMapping -CIPPMapping $Table -APIName $APIName -Request $Request
                 }
-
                 'AutotaskManaged' {
                     $Body = Set-AutotaskManaged -CIPPMapping $Table -APIName $APIName -Request $Request
                 }
-
                 'IronScales' {
                     $Body = Set-IronScalesMapping -CIPPMapping $Table -APIName $APIName -Request $Request
                 }
-
+                'Sherweb' {
+                    $Body = Set-SherwebMapping -CIPPMapping $Table -APIName $APIName -Request $Request
+                }
                 'HaloPSA' {
                     $body = Set-HaloMapping -CIPPMapping $Table -APIName $APIName -Request $Request
                 }
@@ -84,14 +97,14 @@ Function Invoke-ExecExtensionMapping {
             }
         }
     } catch {
-        Write-LogMessage -API $APINAME -user $request.headers.'x-ms-client-principal' -message "mapping API failed. $($_.Exception.Message)" -Sev 'Error'
+        Write-LogMessage -API $APINAME -headers $Request.Headers -message "mapping API failed. $($_.Exception.Message)" -Sev 'Error'
         $body = [pscustomobject]@{'Results' = "Failed. $($_.Exception.Message)" }
     }
 
     try {
         if ($Request.Query.AutoMapping) {
             switch ($Request.Query.AutoMapping) {
-                'NinjaOrgs' {
+                'NinjaOne' {
                     $Batch = [PSCustomObject]@{
                         'NinjaAction'  = 'StartAutoMapping'
                         'FunctionName' = 'NinjaOneQueue'
@@ -109,7 +122,7 @@ Function Invoke-ExecExtensionMapping {
             }
         }
     } catch {
-        Write-LogMessage -API $APINAME -user $request.headers.'x-ms-client-principal' -message "mapping API failed. $($_.Exception.Message)" -Sev 'Error'
+        Write-LogMessage -API $APINAME -headers $Request.Headers -message "mapping API failed. $($_.Exception.Message)" -Sev 'Error'
         $body = [pscustomobject]@{'Results' = "Failed. $($_.Exception.Message)" }
     }
 

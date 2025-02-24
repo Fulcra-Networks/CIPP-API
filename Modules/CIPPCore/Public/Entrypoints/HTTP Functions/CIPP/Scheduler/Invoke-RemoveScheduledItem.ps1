@@ -11,16 +11,16 @@ Function Invoke-RemoveScheduledItem {
     param($Request, $TriggerMetadata)
 
     $APIName = 'RemoveScheduledItem'
-    $User = $request.headers.'x-ms-client-principal'
+    $User = $Request.Headers
 
     $task = @{
-        RowKey       = $Request.Query.ID
+        RowKey       = $Request.Query.id ? $Request.Query.id : $Request.Body.id
         PartitionKey = 'ScheduledTask'
     }
     $Table = Get-CIPPTable -TableName 'ScheduledTasks'
     Remove-AzDataTableEntity -Force @Table -Entity $task
 
-    Write-LogMessage -user $User -API $APINAME -message "Task removed: $($task.RowKey)" -Sev 'Info'
+    Write-LogMessage -Headers $User -API $APINAME -message "Task removed: $($task.RowKey)" -Sev 'Info'
 
     Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
             StatusCode = [HttpStatusCode]::OK

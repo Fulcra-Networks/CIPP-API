@@ -10,13 +10,13 @@ Function Invoke-ExecUpdateSecureScore {
     [CmdletBinding()]
     param($Request, $TriggerMetadata)
 
-    $APIName = $TriggerMetadata.FunctionName
-    Write-LogMessage -user $request.headers.'x-ms-client-principal' -API $APINAME -message 'Accessed this API' -Sev 'Debug'
+    $APIName = $Request.Params.CIPPEndpoint
+    Write-LogMessage -headers $Request.Headers -API $APINAME -message 'Accessed this API' -Sev 'Debug'
 
     # Interact with query parameters or the body of the request.
     $Body = @{
         comment           = $request.body.reason
-        state             = $request.body.resolutionType
+        state             = $request.body.resolutionType.value
         vendorInformation = $request.body.vendorInformation
     }
     try {

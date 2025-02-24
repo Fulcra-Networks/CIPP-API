@@ -10,9 +10,9 @@ Function Invoke-ExecGraphExplorerPreset {
     [CmdletBinding()]
     param($Request, $TriggerMetadata)
 
-    $APIName = $TriggerMetadata.FunctionName
-    Write-LogMessage -user $request.headers.'x-ms-client-principal' -API $APINAME -message 'Accessed this API' -Sev 'Debug'
-
+    $APIName = $Request.Params.CIPPEndpoint
+    Write-LogMessage -headers $Request.Headers -API $APINAME -message 'Accessed this API' -Sev 'Debug'
+    #UNDOREPLACE
     $Username = ([System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($request.headers.'x-ms-client-principal')) | ConvertFrom-Json).userDetails
     # Write to the Azure Functions log stream.
     Write-Host 'PowerShell HTTP trigger function processed a request.'
@@ -20,13 +20,13 @@ Function Invoke-ExecGraphExplorerPreset {
 
     switch ($Action) {
         'Copy' {
-            $Id = (New-Guid).Guid
+            $Id = $Request.Body.preset.id ?  $Request.Body.preset.id: (New-Guid).Guid
         }
         'Save' {
-            $Id = $Request.Body.preset.reportTemplate.value
+            $Id = $Request.Body.preset.id
         }
         'Delete' {
-            $Id = $Request.Body.preset.reportTemplate.value
+            $Id = $Request.Body.preset.id
         }
         default {
             $Action = 'Copy'
@@ -55,7 +55,7 @@ Function Invoke-ExecGraphExplorerPreset {
         $Table = Get-CIPPTable -TableName 'GraphPresets'
         $Message = '{0} preset succeeded' -f $Action
         if ($Action -eq 'Copy') {
-            Add-CIPPAzDataTableEntity @Table -Entity $Preset
+            Add-CIPPAzDataTableEntity @Table -Entity $Preset -Force
             $Success = $true
         } else {
             $Entity = Get-CIPPAzDataTableEntity @Table -Filter "RowKey eq '$Id'"
@@ -67,6 +67,7 @@ Function Invoke-ExecGraphExplorerPreset {
                 }
                 $Success = $true
             } else {
+                Write-Host "username in table: $($Entity.Owner). Username in request: $Username"
                 $Message = 'Error: You can only modify your own presets.'
                 $Success = $false
             }

@@ -10,11 +10,26 @@ Function Invoke-ExecListBackup {
     [CmdletBinding()]
     param($Request, $TriggerMetadata)
 
-    $Result = Get-CIPPBackup -type $Request.query.Type -TenantFilter $Request.query.TenantFilter
-    if ($request.query.NameOnly) {
-        $Result = $Result | Select-Object RowKey, timestamp
+    $CippBackupParams = @{}
+    if ($Request.Query.Type) {
+        $CippBackupParams.Type = $Request.Query.Type
     }
-    Write-LogMessage -user $request.headers.'x-ms-client-principal' -API 'Alerts' -message $request.body.text -Sev $request.body.Severity
+    if ($Request.Query.TenantFilter) {
+        $CippBackupParams.TenantFilter = $Request.Query.TenantFilter
+    }
+    if ($Request.Query.NameOnly) {
+        $CippBackupParams.NameOnly = $true
+    }
+    if ($Request.Query.BackupName) {
+        $CippBackupParams.Name = $Request.Query.BackupName
+    }
+
+    $Result = Get-CIPPBackup @CippBackupParams
+
+    if ($request.Query.NameOnly) {
+        $Result = $Result | Select-Object @{Name = 'BackupName'; exp = { $_.RowKey } }, Timestamp | Sort-Object Timestamp -Descending
+    }
+
     # Associate values to output bindings by calling 'Push-OutputBinding'.
     Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
             StatusCode = [HttpStatusCode]::OK

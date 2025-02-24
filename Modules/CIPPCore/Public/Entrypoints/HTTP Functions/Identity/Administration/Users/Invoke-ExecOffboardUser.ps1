@@ -9,13 +9,13 @@ Function Invoke-ExecOffboardUser {
     #>
     [CmdletBinding()]
     param($Request, $TriggerMetadata)
-    if ($Request.body.user.value) { $AllUsers = $Request.body.user.value } else { $AllUsers = @($Request.body.user) }
+    $AllUsers = $Request.body.user.value
+    $Tenantfilter = $request.body.tenantfilter.value
     $Results = foreach ($username in $AllUsers) {
         try {
             $APIName = 'ExecOffboardUser'
-            Write-LogMessage -user $request.headers.'x-ms-client-principal' -API $APINAME -message 'Accessed this API' -Sev 'Debug'
+            Write-LogMessage -headers $Request.Headers -API $APINAME -message 'Accessed this API' -Sev 'Debug'
 
-            $Tenantfilter = $request.body.tenantfilter
             if ($Request.body.Scheduled.enabled) {
                 $taskObject = [PSCustomObject]@{
                     TenantFilter  = $Tenantfilter
@@ -36,9 +36,9 @@ Function Invoke-ExecOffboardUser {
                         PSA     = [bool]$Request.Body.PostExecution.psa
                     }
                 }
-                Add-CIPPScheduledTask -Task $taskObject -hidden $false
+                Add-CIPPScheduledTask -Task $taskObject -hidden $false -Headers $Request.Headers
             } else {
-                Invoke-CIPPOffboardingJob -Username $Username -TenantFilter $Tenantfilter -Options $Request.body -APIName $APIName -ExecutingUser $request.headers.'x-ms-client-principal'
+                Invoke-CIPPOffboardingJob -Username $Username -TenantFilter $Tenantfilter -Options $Request.body -APIName $APIName -Headers $Request.Headers
             }
             $StatusCode = [HttpStatusCode]::OK
 

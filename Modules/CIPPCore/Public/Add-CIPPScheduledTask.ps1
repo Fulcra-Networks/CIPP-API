@@ -4,7 +4,8 @@ function Add-CIPPScheduledTask {
         [pscustomobject]$Task,
         [bool]$Hidden,
         $DisallowDuplicateName = $false,
-        [string]$SyncType = $null
+        [string]$SyncType = $null,
+        $Headers
     )
 
     $Table = Get-CIPPTable -TableName 'ScheduledTasks'
@@ -17,7 +18,8 @@ function Add-CIPPScheduledTask {
     }
 
     $propertiesToCheck = @('Webhook', 'Email', 'PSA')
-    $PostExecution = ($propertiesToCheck | Where-Object { $task.PostExecution.$_ -eq $true }) -join ','
+    $PostExecutionObject = ($propertiesToCheck | Where-Object { $task.PostExecution.$_ -eq $true })
+    $PostExecution = $PostExecutionObject ? ($PostExecutionObject -join ',') : ($Task.PostExecution.value -join ',')
     $Parameters = [System.Collections.Hashtable]@{}
     foreach ($Key in $task.Parameters.PSObject.Properties.Name) {
         $Param = $task.Parameters.$Key
@@ -30,6 +32,10 @@ function Add-CIPPScheduledTask {
         } else {
             $Parameters[$Key] = $Param
         }
+    }
+
+    if ($Headers) {
+        $Parameters.Headers = $Headers | Select-Object -Property 'x-forwarded-for', 'x-ms-client-principal', 'x-ms-client-principal-idp', 'x-ms-client-principal-name'
     }
 
     $Parameters = ($Parameters | ConvertTo-Json -Depth 10 -Compress)
@@ -59,7 +65,7 @@ function Add-CIPPScheduledTask {
         PartitionKey         = [string]'ScheduledTask'
         TaskState            = [string]'Planned'
         RowKey               = [string]$RowKey
-        Tenant               = [string]$task.TenantFilter
+        Tenant               = $task.TenantFilter.value ? "$($task.TenantFilter.value)" : "$($task.TenantFilter)"
         Name                 = [string]$task.Name
         Command              = [string]$task.Command.value
         Parameters           = [string]$Parameters

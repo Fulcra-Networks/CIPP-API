@@ -32,14 +32,19 @@ function Invoke-ExecPartnerWebhook {
             }
         }
         'CreateSubscription' {
+            if ($Request.Body.EventType.value) {
+                $Request.Body.EventType = $Request.Body.EventType.value
+            }
+
             $BaseURL = ([System.Uri]$Request.Headers.'x-ms-original-url').Host
             $Webhook = @{
                 TenantFilter  = $env:TenantID
                 PartnerCenter = $true
                 BaseURL       = $BaseURL
                 EventType     = $Request.Body.EventType
-                ExecutingUser = $Request.Headers.'x-ms-client-principal'
+                Headers = $Request.Headers.'x-ms-client-principal'
             }
+
             $Results = New-CIPPGraphSubscription @Webhook
 
             $ConfigTable = Get-CIPPTable -TableName Config

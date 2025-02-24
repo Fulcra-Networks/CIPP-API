@@ -11,9 +11,39 @@ function Push-ExecScheduledCommand {
     $task = $Item.TaskInfo
     $commandParameters = $Item.Parameters | ConvertTo-Json -Depth 10 | ConvertFrom-Json -AsHashtable
 
+    $Function = Get-Command -Name $Item.Command
+    if ($null -eq $Function) {
+        $Results = "Task Failed: The command $($Item.Command) does not exist."
+        $State = 'Failed'
+        Update-AzDataTableEntity -Force @Table -Entity @{
+            PartitionKey = $task.PartitionKey
+            RowKey       = $task.RowKey
+            Results      = "$Results"
+            TaskState    = $State
+        }
+        Write-LogMessage -API 'Scheduler_UserTasks' -tenant $tenant -message "Failed to execute task $($task.Name): The command $($Item.Command) does not exist." -sev Error
+        return
+    }
+
+    try {
+        $PossibleParams = $Function.Parameters.Keys
+        $keysToRemove = [System.Collections.Generic.List[string]]@()
+        foreach ($key in $commandParameters.Keys) {
+            if (-not ($PossibleParams -contains $key)) {
+                $keysToRemove.Add($key)
+            }
+        }
+        foreach ($key in $keysToRemove) {
+            $commandParameters.Remove($key)
+        }
+    } catch {
+        Write-Host "Failed to remove parameters: $($_.Exception.Message)"
+    }
+
     $tenant = $Item.Parameters.TenantFilter
     Write-Host "Started Task: $($Item.Command) for tenant: $tenant"
     try {
+
         try {
             Write-Host "Starting task: $($Item.Command) with parameters: $($commandParameters | ConvertTo-Json)"
             $results = & $Item.Command @commandParameters
@@ -49,7 +79,7 @@ function Push-ExecScheduledCommand {
     } catch {
         $errorMessage = $_.Exception.Message
         if ($task.Recurrence -ne 0) { $State = 'Failed - Planned' } else { $State = 'Failed' }
-        Update-AzDataTableEntity @Table -Entity @{
+        Update-AzDataTableEntity -Force @Table -Entity @{
             PartitionKey = $task.PartitionKey
             RowKey       = $task.RowKey
             Results      = "$errorMessage"
@@ -83,7 +113,7 @@ function Push-ExecScheduledCommand {
 
     if ($task.Recurrence -eq '0' -or [string]::IsNullOrEmpty($task.Recurrence)) {
         Write-Host 'Recurrence empty or 0. Task is not recurring. Setting task state to completed.'
-        Update-AzDataTableEntity @Table -Entity @{
+        Update-AzDataTableEntity -Force @Table -Entity @{
             PartitionKey = $task.PartitionKey
             RowKey       = $task.RowKey
             Results      = "$StoredResults"
@@ -110,7 +140,7 @@ function Push-ExecScheduledCommand {
 
         $nextRunUnixTime = [int64]$task.ScheduledTime + [int64]$secondsToAdd
         Write-Host "The job is recurring. It was scheduled for $($task.ScheduledTime). The next runtime should be $nextRunUnixTime"
-        Update-AzDataTableEntity @Table -Entity @{
+        Update-AzDataTableEntity -Force @Table -Entity @{
             PartitionKey  = $task.PartitionKey
             RowKey        = $task.RowKey
             Results       = "$StoredResults"

@@ -15,7 +15,9 @@ Function Invoke-CIPPStandardTeamsGlobalMeetingPolicy {
         TAG
             "lowimpact"
         ADDEDCOMPONENT
-            {"type":"Select","name":"standards.TeamsGlobalMeetingPolicy.DesignatedPresenterRoleMode","label":"Default value of the `Who can present?`","values":[{"label":"EveryoneUserOverride","value":"EveryoneUserOverride"},{"label":"EveryoneInCompanyUserOverride","value":"EveryoneInCompanyUserOverride"},{"label":"EveryoneInSameAndFederatedCompanyUserOverride","value":"EveryoneInSameAndFederatedCompanyUserOverride"},{"label":"OrganizerOnlyUserOverride","value":"OrganizerOnlyUserOverride"}]}
+            {"type":"autoComplete","multiple":false,"name":"standards.TeamsGlobalMeetingPolicy.DesignatedPresenterRoleMode","label":"Default value of the `Who can present?`","options":[{"label":"EveryoneUserOverride","value":"EveryoneUserOverride"},{"label":"EveryoneInCompanyUserOverride","value":"EveryoneInCompanyUserOverride"},{"label":"EveryoneInSameAndFederatedCompanyUserOverride","value":"EveryoneInSameAndFederatedCompanyUserOverride"},{"label":"OrganizerOnlyUserOverride","value":"OrganizerOnlyUserOverride"}]}
+            {"type":"switch","name":"standards.TeamsGlobalMeetingPolicy.AllowAnonymousUsersToJoinMeeting","label":"Allow anonymous users to join meeting"}
+            {"type":"autoComplete","multiple":false,"name":"standards.TeamsGlobalMeetingPolicy.MeetingChatEnabledType","label":"Meeting chat policy","options":[{"label":"On for everyone","value":"Enabled"},{"label":"On for everyone but anonymous users","value":"EnabledExceptAnonymous"},{"label":"Off for everyone","value":"Disabled"}]}
         IMPACT
             Low Impact
         POWERSHELLEQUIVALENT
@@ -25,7 +27,7 @@ Function Invoke-CIPPStandardTeamsGlobalMeetingPolicy {
         UPDATECOMMENTBLOCK
             Run the Tools\Update-StandardsComments.ps1 script to update this comment block
     .LINK
-        https://docs.cipp.app/user-documentation/tenant/standards/edit-standards
+        https://docs.cipp.app/user-documentation/tenant/standards/list-standards/teams-standards#low-impact
     #>
     ##$Rerun -Type Standard -Tenant $Tenant -Settings $Settings 'TeamsGlobalMeetingPolicy'
 
@@ -33,16 +35,12 @@ Function Invoke-CIPPStandardTeamsGlobalMeetingPolicy {
     $CurrentState = New-TeamsRequest -TenantFilter $Tenant -Cmdlet 'Get-CsTeamsMeetingPolicy' -CmdParams @{Identity = 'Global' }
     | Select-Object AllowAnonymousUsersToJoinMeeting, AllowAnonymousUsersToStartMeeting, AutoAdmittedUsers, AllowPSTNUsersToBypassLobby, MeetingChatEnabledType, DesignatedPresenterRoleMode, AllowExternalParticipantGiveRequestControl
 
-    if ($null -eq $Settings.DesignatedPresenterRoleMode) { $Settings.DesignatedPresenterRoleMode = $CurrentState.DesignatedPresenterRoleMode }
-    if ($null -eq $Settings.AllowAnonymousUsersToJoinMeeting) { $Settings.AllowAnonymousUsersToJoinMeeting = $CurrentState.AllowAnonymousUsersToJoinMeeting }
-    if ($null -eq $Settings.MeetingChatEnabledType) { $Settings.MeetingChatEnabledType = $CurrentState.MeetingChatEnabledType } # Enabled, EnabledExceptAnonymous, Disabled
-
     $StateIsCorrect = ($CurrentState.AllowAnonymousUsersToJoinMeeting -eq $Settings.AllowAnonymousUsersToJoinMeeting) -and
                         ($CurrentState.AllowAnonymousUsersToStartMeeting -eq $false) -and
                         ($CurrentState.AutoAdmittedUsers -eq 'EveryoneInCompanyExcludingGuests') -and
                         ($CurrentState.AllowPSTNUsersToBypassLobby -eq $false) -and
-                        ($CurrentState.MeetingChatEnabledType -eq $Settings.MeetingChatEnabledType) -and
-                        ($CurrentState.DesignatedPresenterRoleMode -eq $Settings.DesignatedPresenterRoleMode) -and
+                        ($CurrentState.MeetingChatEnabledType -eq $Settings.MeetingChatEnabledType.value) -and
+                        ($CurrentState.DesignatedPresenterRoleMode -eq $Settings.DesignatedPresenterRoleMode.value) -and
                         ($CurrentState.AllowExternalParticipantGiveRequestControl -eq $false)
 
     if ($Settings.remediate -eq $true) {
@@ -55,8 +53,8 @@ Function Invoke-CIPPStandardTeamsGlobalMeetingPolicy {
                 AllowAnonymousUsersToStartMeeting          = $false
                 AutoAdmittedUsers                          = 'EveryoneInCompanyExcludingGuests'
                 AllowPSTNUsersToBypassLobby                = $false
-                MeetingChatEnabledType                     = $Settings.MeetingChatEnabledType
-                DesignatedPresenterRoleMode                = $Settings.DesignatedPresenterRoleMode
+                MeetingChatEnabledType                     = $Settings.MeetingChatEnabledType.value
+                DesignatedPresenterRoleMode                = $Settings.DesignatedPresenterRoleMode.value
                 AllowExternalParticipantGiveRequestControl = $false
             }
 
