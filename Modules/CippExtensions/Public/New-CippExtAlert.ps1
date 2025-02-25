@@ -17,7 +17,7 @@ function New-CippExtAlert {
 
                     $TenantId = (Get-Tenants | Where-Object defaultDomainName -EQ $Alert.TenantId).customerId
                     $MappingFile = Get-CIPPAzDataTableEntity @MappingTable -Filter "PartitionKey eq 'Mapping'"
-                    $MappedId = ($MappingFile | Where-Object { $_.RowKey -eq $TenantId }).AutotaskPSA
+                    $MappedId = ($MappingFile | Where-Object { $_.RowKey -eq $TenantId }).IntegrationId
 
                     if (!$MappedId) { $MappedId = 1 } #This auto assigns to the AT base company.
 

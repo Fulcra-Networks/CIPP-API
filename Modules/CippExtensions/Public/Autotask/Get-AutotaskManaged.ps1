@@ -3,21 +3,21 @@ function Get-AutotaskManaged {
     param (
         $CIPPMapping
     )
-    
-    $Filter = "PartitionKey eq 'Mapping'"
-    
-    
+
+    $Filter = "PartitionKey eq 'AutotaskMapping'"
+
+
     $managed = Get-CIPPAzDataTableEntity @CIPPMapping -Filter $Filter | ForEach-Object {
-        if($null -ne $_.AutotaskPSAName -and "" -ne $_.AutotaskPSAName){
+        if(![String]::IsNullOrEmpty($_.IntegrationName)){
             [PSCustomObject]@{
                 name  = "$($_.RowKey)"
-                label = "$($_.AutotaskPSAName)"
+                label = "$($_.IntegrationName)"
                 value = [bool](Get-ManagedState $_)
-                aid   = "$($_.AutotaskPSA)"
+                aid   = "$($_.IntegrationId)"
             }
         }
     }
-    
+
     $MappingObj = [PSCustomObject]@{
         ManagedCusts = @($managed)
     }
@@ -27,7 +27,7 @@ function Get-AutotaskManaged {
 
 
 function Get-ManagedState {
-    param($Mapping) 
+    param($Mapping)
     if($null -eq $Mapping.IsManaged){return $false}
     return [bool]::Parse($Mapping.IsManaged)
 }
