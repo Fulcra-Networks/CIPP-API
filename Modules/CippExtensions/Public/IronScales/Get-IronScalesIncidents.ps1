@@ -51,7 +51,7 @@ function New-IronScalestickets {
 
                             $body = Get-BodyForTicket $company
                             $estHr = 0.1*$company.Incidents.Count
-                            New-AutotaskTicket -atCompany $ATCompany.AutotaskPSA `
+                            New-AutotaskTicket -atCompany $ATCompany.IntegrationId `
                                 -title $tTitle `
                                 -description ($body|Join-String) `
                                 -estHr $estHr `
