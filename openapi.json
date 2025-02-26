@@ -4939,6 +4939,36 @@
         }
       }
     },
+    "/ExecAssetManagement":{
+      "get":{
+        "description":"GetPsaRmmAssets",
+        "summary": "GetPsaRmmAssets",
+        "tags": [],
+        "parameters": [
+          {
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "name": "TenantFilter",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {},
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful operation"
+          }
+        }
+      }
+    },
     "/ListAppStatus": {
       "get": {
         "description": "ListAppStatus",

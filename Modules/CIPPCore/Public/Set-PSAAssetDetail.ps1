@@ -152,16 +152,3 @@ function Set-PSAAssetDetail {
         throw "Failed to set alias: $($_.Exception.Message)"
     }
 }
-
-
-##TODO##MOVE TO NCentral Extension dir
-function Get-NCentralJWT {
-    if (!$ENV:NCentralJWT) {
-        $null = Connect-AzAccount -Identity
-        $ClientSecret = (Get-AzKeyVaultSecret -VaultName $ENV:WEBSITE_DEPLOYMENT_ID -Name 'NCentral' -AsPlainText)
-    } else {
-        $ClientSecret = $ENV:NCentralJWT
-    }
-
-    return $ClientSecret
-}

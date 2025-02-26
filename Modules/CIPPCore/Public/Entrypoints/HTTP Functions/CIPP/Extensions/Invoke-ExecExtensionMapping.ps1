@@ -22,15 +22,15 @@ Function Invoke-ExecExtensionMapping {
             'Autotask' {
                 $Body = Get-AutotaskMapping -CIPPMapping $Table
             }
-
             'AutotaskManaged' {
                 $Body = Get-AutotaskManaged -CIPPMapping $Table
             }
-
             'IronScales' {
                 $Body = Get-IronScalesMapping -CIPPMapping $Table
             }
-
+            'NCentral'{
+                $Body = Get-NCentralMapping -CIPPMapping $Table
+            }
             'HaloPSA' {
                 $body = Get-HaloMapping -CIPPMapping $Table
             }
@@ -73,6 +73,9 @@ Function Invoke-ExecExtensionMapping {
                 }
                 'IronScales' {
                     $Body = Set-IronScalesMapping -CIPPMapping $Table -APIName $APIName -Request $Request
+                }
+                'NCentral'{
+                    $Body = Set-NCentralMapping -CIPPMapping $Table -APIName $APIName -Request $Request
                 }
                 'Sherweb' {
                     $Body = Set-SherwebMapping -CIPPMapping $Table -APIName $APIName -Request $Request
