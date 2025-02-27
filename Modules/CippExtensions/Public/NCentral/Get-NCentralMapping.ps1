@@ -1,4 +1,4 @@
-function Get-AutotaskMapping {
+function Get-NCentralMapping {
     [CmdletBinding()]
     param (
         $CIPPMapping
@@ -28,19 +28,17 @@ function Get-AutotaskMapping {
 
         #Get NCentral customer list
         $ncJWT = Get-NCentralJWT
-        Connect-Ncentral -ApiHost $Configuration.NCentral.ApiHost -key ($ncJWT|ConvertTo-SecureString -AsPlainText -Force)
+        Connect-Ncentral -ApiHost $Configuration.ApiHost -key ($ncJWT|ConvertTo-SecureString -AsPlainText -Force)
 
         $rawcustomers = Get-NCentralCustomer -All
-
     } catch {
         $Message = if ($_.ErrorDetails.Message) {
             Get-NormalizedError -Message $_.ErrorDetails.Message
         } else {
             $_.Exception.message
         }
-
         Write-LogMessage -Message "Could not get NCentral customers, error: $Message " -Level Error -tenant 'CIPP' -API 'NCentralMapping'
-        $RawAutotaskCustomers = @(@{name = "Could not get NCentral Clients, error: $Message" })
+        $rawcustomers = @(@{customerName = "Could not get NCentral Clients, error: $Message"; customerId = 0})
     }
 
     $NCentralCustomers = $rawcustomers | Sort-Object -Property companyName | ForEach-Object {

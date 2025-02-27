@@ -1,11 +1,11 @@
 function Get-AutotaskToken {
     [CmdletBinding()]
     param (
-        $Configuration 
+        $Configuration
         )
-        
+
     Import-Module AutotaskAPI
-    
+
     if (!$ENV:AutotaskSecret) {
         $null = Connect-AzAccount -Identity
         $ClientSecret = (Get-AzKeyVaultSecret -VaultName $ENV:WEBSITE_DEPLOYMENT_ID -Name 'Autotask' -AsPlainText)
@@ -24,7 +24,7 @@ function Get-AutotaskToken {
         } else {
             $_.Exception.message
         }
-        Write-LogMessage -Message $Message -sev error -API 'Autotask' 
+        Write-LogMessage -Message $Message -sev error -API 'Autotask'
     }
     return $null
 

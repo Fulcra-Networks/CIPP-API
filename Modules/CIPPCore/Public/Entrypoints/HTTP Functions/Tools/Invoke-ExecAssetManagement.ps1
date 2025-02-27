@@ -8,7 +8,13 @@ Function Invoke-ExecAssetManagement {
     if ($Request.Query.TenantFilter -eq 'AllTenants') {
         return 'Not Supported'
     }
-    Table = Get-CIPPTable -TableName Extensionsconfig
+
+    $TblTenant = Get-CIPPTable -TableName Tenants
+    $Tenants = Get-CIPPAzDataTableEntity @TblTenant -Filter "PartitionKey eq 'Tenants'"
+
+    $tenantId = $Tenants | Where-Object { $_.defaultDomainName -eq $TenantFilter } | Select-Object -ExpandProperty RowKey
+
+    $Table = Get-CIPPTable -TableName Extensionsconfig
     $Configuration = (Get-CIPPAzDataTableEntity @Table).config | ConvertFrom-Json -Depth 10
 
     $cfgPSA = Get-PSAConfig $Configuration
@@ -22,7 +28,7 @@ Function Invoke-ExecAssetManagement {
 
     Switch ($cfgPSA.Name) {
         'Autotask' {
-            $PSADevices = Get-AutotaskDevices -tenantId $TenantFilter
+            $PSADevices = Get-AutotaskDevices -tenantId $tenantId
         }
         'HaloPSA' {
             $PSADevices = @()
@@ -31,7 +37,7 @@ Function Invoke-ExecAssetManagement {
 
     Switch ($cfgRMM.Name) {
         'NCentral' {
-            $RMMDevices = Get-NCentralDevices -tenantId $TenantFilter
+            $RMMDevices = Get-NCentralDevices -tenantId $tenantId
         }
         'NinjaOne' {
             $RMMDevices = @()
@@ -43,6 +49,7 @@ Function Invoke-ExecAssetManagement {
     $UnmatchedPSADevices = @()
     $UnmatchedRMMDevices = @()
 
+    Write-Host "$('-'*20)> Got $($RMMDevices.Count) RMM Devices and $($PSADevices.Count) PSA Devices"
     foreach($PSADevice in $PSADevices){
         if($RMMDevice = $RMMDevices | Where-Object { $_.Id -eq $PSADevice.rmmId }){
             $MatchedDevices += [PSCustomObject]@{
@@ -56,7 +63,7 @@ Function Invoke-ExecAssetManagement {
             $UnmatchedPSADevices += [PSCustomObject]@{
                 Name = $PSADevice.Name
                 SerialNumber = $PSADevice.SerialNumber
-                RMMId = $null
+                RMMId = $PSADevice.rmmId
                 RMMName= $null
             }
         }
@@ -82,6 +89,8 @@ Function Invoke-ExecAssetManagement {
         UnmatchedPSADevices = @($UnmatchedPSADevices)
         UnmatchedRMMDevices = @($UnmatchedRMMDevices)
     }
+
+    Write-Host "$($body|COnvertto-json -depth 10)"
 
     Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
         StatusCode = [HttpStatusCode]::OK

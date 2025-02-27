@@ -8,7 +8,7 @@ function Get-AutotaskDevices {
         $Table = Get-CIPPTable -TableName Extensionsconfig
         $Configuration = ((Get-CIPPAzDataTableEntity @Table).config | ConvertFrom-Json -ea stop).Autotask
 
-        $AtCustID = $ExtensionMappings | Where-Object { $_.rowId -eq $tenantId } | Select-Object -ExpandProperty IntegrationId
+        $AtCustID = $ExtensionMappings | Where-Object { $_.rowKey -eq $tenantId } | Select-Object -ExpandProperty IntegrationId
 
         Get-AutotaskToken -configuration $Configuration | Out-Null
 
@@ -34,6 +34,7 @@ function Get-AutotaskDevices {
         [PSCustomObject]@{
             name         = $_.referenceTitle
             serialNumber = $_.serialNumber
+            psaId        = $_.id
             rmmId        = $devInfo.value
         }
     }
