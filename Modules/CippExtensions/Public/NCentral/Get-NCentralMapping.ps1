@@ -28,9 +28,12 @@ function Get-NCentralMapping {
 
         #Get NCentral customer list
         $ncJWT = Get-NCentralJWT
+        Write-LogMessage -Message "Get NCentral token ($($ncJWT.substring(0,6)))" -Level Info -tenant 'CIPP' -API 'NCentralMapping'
+
         Connect-Ncentral -ApiHost $Configuration.ApiHost -key ($ncJWT|ConvertTo-SecureString -AsPlainText -Force)
 
         $rawcustomers = Get-NCentralCustomer -All
+        Write-LogMessage -Message "Get NCentral customers ($($rawcustomers.count))" -Level Info -tenant 'CIPP' -API 'NCentralMapping'
     } catch {
         $Message = if ($_.ErrorDetails.Message) {
             Get-NormalizedError -Message $_.ErrorDetails.Message
