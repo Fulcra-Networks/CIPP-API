@@ -19,16 +19,16 @@ Function Invoke-ExecExtensionMapping {
     if ($Request.Query.List) {
         switch ($Request.Query.List) {
             'Autotask' {
-                $Body = Get-AutotaskMapping -CIPPMapping $Table
+                $Result = Get-AutotaskMapping -CIPPMapping $Table
             }
             'AutotaskManaged' {
-                $Body = Get-AutotaskManaged -CIPPMapping $Table
+                $Result = Get-AutotaskManaged -CIPPMapping $Table
             }
             'IronScales' {
-                $Body = Get-IronScalesMapping -CIPPMapping $Table
+                $Result = Get-IronScalesMapping -CIPPMapping $Table
             }
             'NCentral'{
-                $Body = Get-NCentralMapping -CIPPMapping $Table
+                $Result = Get-NCentralMapping -CIPPMapping $Table
             }
             'HaloPSA' {
                 $Result = Get-HaloMapping -CIPPMapping $Table
@@ -65,16 +65,16 @@ Function Invoke-ExecExtensionMapping {
         if ($Request.Query.AddMapping) {
             switch ($Request.Query.AddMapping) {
                 'Autotask' {
-                    $Body = Set-AutotaskMapping -CIPPMapping $Table -APIName $APIName -Request $Request
+                    $Result = Set-AutotaskMapping -CIPPMapping $Table -APIName $APIName -Request $Request
                 }
                 'AutotaskManaged' {
-                    $Body = Set-AutotaskManaged -CIPPMapping $Table -APIName $APIName -Request $Request
+                    $Result = Set-AutotaskManaged -CIPPMapping $Table -APIName $APIName -Request $Request
                 }
                 'IronScales' {
-                    $Body = Set-IronScalesMapping -CIPPMapping $Table -APIName $APIName -Request $Request
+                    $Result = Set-IronScalesMapping -CIPPMapping $Table -APIName $APIName -Request $Request
                 }
                 'NCentral'{
-                    $Body = Set-NCentralMapping -CIPPMapping $Table -APIName $APIName -Request $Request
+                    $Result = Set-NCentralMapping -CIPPMapping $Table -APIName $APIName -Request $Request
                 }
                 'Sherweb' {
                     $Result = Set-SherwebMapping -CIPPMapping $Table -APIName $APIName -Request $Request
