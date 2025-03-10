@@ -25,7 +25,7 @@ function Get-AutotaskDevices {
         $confItems = Get-AutotaskAPIResource -Resource configurationItems -SearchQuery ($filter|ConvertTo-Json -Depth 10 -Compress)
     }
     catch{
-        Write-LogMessage -Message "Could not get Autotask Devices, error: $($_.Exception.Message)" -Level Error -tenant 'CIPP' -API 'AutotaskDevices'
+        Write-LogMessage -Message "Could not get Autotask Devices, error: $($_.Exception.Message)" -sev Error -tenant 'CIPP' -API 'AutotaskDevices'
     }
 
     #Structure the results for consistency across other Extensions.

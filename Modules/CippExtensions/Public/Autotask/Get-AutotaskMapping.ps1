@@ -50,7 +50,7 @@ function Get-AutotaskMapping {
             $_.Exception.message
         }
 
-        Write-LogMessage -Message "Could not get Autotask Clients, error: $Message " -Level Error -tenant 'CIPP' -API 'AutotaskMapping'
+        Write-LogMessage -Message "Could not get Autotask Clients, error: $Message " -sev Error -tenant 'CIPP' -API 'AutotaskMapping'
         $RawAutotaskCustomers = @(@{name = "Could not get Autotask Clients, error: $Message" })
     }
 

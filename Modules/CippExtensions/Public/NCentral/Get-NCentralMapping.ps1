@@ -6,7 +6,7 @@ function Get-NCentralMapping {
     #Get available mappings
     $Mappings = [pscustomobject]@{}
 
-    Write-LogMessage -Message "Getting NCentral mappings" -Level Info -tenant 'CIPP' -API 'NCentralMapping'
+    Write-LogMessage -Message "Getting NCentral mappings" -sev Info -tenant 'CIPP' -API 'NCentralMapping'
 
     $ExtensionMappings = Get-ExtensionMapping -Extension 'NCentral'
     $Tenants = Get-Tenants -IncludeErrors
@@ -30,19 +30,19 @@ function Get-NCentralMapping {
 
         #Get NCentral customer list
         $ncJWT = Get-NCentralJWT
-        Write-LogMessage -Message "Get NCentral token ($($ncJWT.substring(0,6)))" -Level Info -tenant 'CIPP' -API 'NCentralMapping'
+        Write-LogMessage -Message "Get NCentral token ($($ncJWT.substring(0,6)))" -sev Info -tenant 'CIPP' -API 'NCentralMapping'
 
         Connect-Ncentral -ApiHost $Configuration.ApiHost -key ($ncJWT|ConvertTo-SecureString -AsPlainText -Force)
 
         $rawcustomers = Get-NCentralCustomer -All
-        Write-LogMessage -Message "Get NCentral customers ($($rawcustomers.count))" -Level Info -tenant 'CIPP' -API 'NCentralMapping'
+        Write-LogMessage -Message "Get NCentral customers ($($rawcustomers.count))" -sev Info -tenant 'CIPP' -API 'NCentralMapping'
     } catch {
         $Message = if ($_.ErrorDetails.Message) {
             Get-NormalizedError -Message $_.ErrorDetails.Message
         } else {
             $_.Exception.message
         }
-        Write-LogMessage -Message "Could not get NCentral customers, error: $Message " -Level Error -tenant 'CIPP' -API 'NCentralMapping'
+        Write-LogMessage -Message "Could not get NCentral customers, error: $Message " -sev Error -tenant 'CIPP' -API 'NCentralMapping'
         $rawcustomers = @(@{customerName = "Could not get NCentral Clients, error: $Message"; customerId = 0})
     }
 

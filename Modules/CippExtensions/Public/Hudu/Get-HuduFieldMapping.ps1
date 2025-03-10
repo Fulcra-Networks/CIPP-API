@@ -39,7 +39,7 @@ function Get-HuduFieldMapping {
             $_.Exception.message
         }
 
-        Write-LogMessage -Message "Could not get Hudu Asset Layouts, error: $Message " -Level Error -tenant 'CIPP' -API 'HuduMapping'
+        Write-LogMessage -Message "Could not get Hudu Asset Layouts, error: $Message " -sev Error -tenant 'CIPP' -API 'HuduMapping'
         $AssetLayouts = @(@{name = "Could not get Hudu Asset Layouts, error: $Message"; value = '-1' })
     }
 

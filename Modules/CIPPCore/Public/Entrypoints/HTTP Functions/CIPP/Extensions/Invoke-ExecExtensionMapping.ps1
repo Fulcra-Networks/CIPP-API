@@ -16,7 +16,7 @@ Function Invoke-ExecExtensionMapping {
 
     $Table = Get-CIPPTable -TableName CippMapping
 
-    Write-LogMessage -Message "Extension Mapping: $($Request.Query.List)" -Level Info -tenant 'CIPP' -API $APIName
+    Write-LogMessage -Message "Extension Mapping: $($Request.Query.List)" -sev Info -tenant 'CIPP' -API $APIName
 
     if ($Request.Query.List) {
         switch ($Request.Query.List) {

@@ -37,7 +37,7 @@ function Get-IronScalesMapping {
             $_.Exception.message
         }
 
-        Write-LogMessage -Message "Could not get IronScales Companies error: $Message " -Level Error -tenant 'CIPP' -API 'IronScalesMapping'
+        Write-LogMessage -Message "Could not get IronScales Companies error: $Message " -sev Error -tenant 'CIPP' -API 'IronScalesMapping'
         $RawCompanies = @(@{name = "Could not get IronScales Companies, error: $Message" })
     }
 
