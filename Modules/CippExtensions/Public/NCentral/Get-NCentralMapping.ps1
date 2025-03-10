@@ -6,6 +6,8 @@ function Get-NCentralMapping {
     #Get available mappings
     $Mappings = [pscustomobject]@{}
 
+    Write-LogMessage -Message "Getting NCentral mappings" -Level Info -tenant 'CIPP' -API 'NCentralMapping'
+
     $ExtensionMappings = Get-ExtensionMapping -Extension 'NCentral'
     $Tenants = Get-Tenants -IncludeErrors
 
