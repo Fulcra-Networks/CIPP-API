@@ -66,5 +66,6 @@ function Get-AutotaskMapping {
         Mappings    = $Mappings
     }
 
+    Write-LogMessage -Message "Returning Mapping Data: $($MappingObj|ConvertTo-Json -Depth 10 -Compress)" -sev Info -tenant 'CIPP' -API 'AutotaskMapping'
     return $MappingObj
 }
