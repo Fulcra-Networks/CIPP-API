@@ -33,7 +33,8 @@ function Get-AutotaskDevices {
     }
 
     #Structure the results for consistency across other Extensions.
-    $results = foreach($conf in $confItems) {
+    $results = @()
+    foreach($conf in $confItems) {
         $devInfo = ($conf.userDefinedFields|Where-Object { $_.name -eq 'N-central Device ID'})
 
         $confContract = ""
@@ -41,10 +42,10 @@ function Get-AutotaskDevices {
             $confContract = $customerContracts | ? { $_.id -eq $conf.contractID}
         }
 
-        [PSCustomObject]@{
-            name         = $_.referenceTitle
-            serialNumber = $_.serialNumber
-            psaId        = $_.id
+        $results += [PSCustomObject]@{
+            name         = $conf.referenceTitle
+            serialNumber = $conf.serialNumber
+            psaId        = $conf.id
             rmmId        = $devInfo.value
             contract     = $confContract.contractName
         }
