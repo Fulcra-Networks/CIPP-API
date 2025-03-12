@@ -12,6 +12,10 @@ function Get-AutotaskDevices {
 
         Get-AutotaskToken -configuration $Configuration | Out-Null
 
+
+        $customerContracts = Get-AutotaskAPIResource -resource Contracts -SimpleSearch "companyid eq $($AtCustID)"
+
+
         #Retrieve all Active, Workstation type devices for the tenant
         $filter = [PSCustomObject]@{
             "filter"=@(
@@ -29,13 +33,20 @@ function Get-AutotaskDevices {
     }
 
     #Structure the results for consistency across other Extensions.
-    $results = $confItems | Sort-Object -Property name | ForEach-Object {
-        $devInfo = ($_.userDefinedFields|Where-Object { $_.name -eq 'N-central Device ID'})
+    $results = foreach($conf in $confItems) {
+        $devInfo = ($conf.userDefinedFields|Where-Object { $_.name -eq 'N-central Device ID'})
+
+        $confContract = ""
+        if(![String]::IsNullOrEmpty($conf.contractID)){
+            $confContract = $customerContracts | ? { $_.id -eq $conf.contractID}
+        }
+
         [PSCustomObject]@{
             name         = $_.referenceTitle
             serialNumber = $_.serialNumber
             psaId        = $_.id
             rmmId        = $devInfo.value
+            contract     = $confContract.contractName
         }
     }
 

@@ -53,18 +53,20 @@ Function Invoke-ExecAssetManagement {
     foreach($PSADevice in $PSADevices){
         if($RMMDevice = $RMMDevices | Where-Object { $_.Id -eq $PSADevice.rmmId }){
             $MatchedDevices += [PSCustomObject]@{
-                Name = $PSADevice.Name
-                SerialNumber = $PSADevice.SerialNumber
-                RMMId = $PSADevice.RMMId
-                RMMName= $RMMDevice.name
+                Name            = $PSADevice.Name
+                Contract        = $PSADevice.Contract
+                SerialNumber    = $PSADevice.SerialNumber
+                RMMId           = $PSADevice.RMMId
+                RMMName         = $RMMDevice.name
             }
         }
         else {
             $UnmatchedPSADevices += [PSCustomObject]@{
-                Name = $PSADevice.Name
-                SerialNumber = $PSADevice.SerialNumber
-                RMMId = $PSADevice.rmmId
-                RMMName= $null
+                Name            = $PSADevice.Name
+                Contract        = $PSADevice.Contract
+                SerialNumber    = $PSADevice.SerialNumber
+                RMMId           = $PSADevice.rmmId
+                RMMName         = $null
             }
         }
     }
@@ -75,10 +77,11 @@ Function Invoke-ExecAssetManagement {
         }
         else {
             $UnmatchedRMMDevices += [PSCustomObject]@{
-                Name = $RMMDevice.Name
-                SerialNumber = $RMMDevice.SerialNumber
-                RMMId = $RMMDevice.Id
-                RMMName= $RMMDevice.name
+                Name             = $RMMDevice.Name
+                Contract         = ""
+                SerialNumber     = $RMMDevice.SerialNumber
+                RMMId            = $RMMDevice.Id
+                RMMName          = $RMMDevice.name
             }
         }
     }
@@ -90,7 +93,7 @@ Function Invoke-ExecAssetManagement {
         UnmatchedRMMDevices = @($UnmatchedRMMDevices)
     }
 
-    Write-Host "$($body|COnvertto-json -depth 10)"
+    Write-Host "$($body|ConvertTo-json -depth 10)"
 
     Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
         StatusCode = [HttpStatusCode]::OK

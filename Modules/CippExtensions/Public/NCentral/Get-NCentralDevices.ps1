@@ -11,14 +11,18 @@ Function Get-NCentralDevices {
     Connect-Ncentral -ApiHost $Configuration.ApiHost -key ($ncJWT|ConvertTo-SecureString -AsPlainText -Force)
 
     $customerId = $ExtensionMappings | Where-Object { $_.rowKey -eq $tenantId }
-    $RawDevices = Get-NCentralDevice -CustomerId $customerId.IntegrationId
+    $custDevices = Get-NCentralDevice -CustomerId $customerId.IntegrationId
 
-    $results = $RawDevices | Sort-Object -Property name | ForEach-Object {
-        [PSCustomObject]@{
-            Id           = $_.deviceId
-            name         = $_.longName
-            serialNumber = ''
+    #$devDetails[0].data.computersystem.serialnumber
+    $results = @()
+    foreach($device in ($custDevices | Where-Object {$_.deviceClass -ne 'Other'})){
+        $DevDetail = Get-NCentralDeviceDetail -DeviceId $device.deviceId
+        $fDetail = [PSCustomObject]@{
+            Id = $device.deviceId
+            name = $device.longName
+            serialNumber = $DevDetail.data.computersystem.serialnumber
         }
+        $results += $fDetail
     }
 
     return $results
