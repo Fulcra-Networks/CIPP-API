@@ -13,10 +13,8 @@ function New-CippExtAlert {
         switch ($ConfigItem) {
             "Autotask" {
                 If ($Configuration.Autotask.enabled) {
-                    Get-AutotaskToken -configuration $Configuration.Autotask
-
                     $TenantId = (Get-Tenants | Where-Object defaultDomainName -EQ $Alert.TenantId).customerId
-                    $MappingFile = Get-CIPPAzDataTableEntity @MappingTable -Filter "PartitionKey eq 'Mapping'"
+                    $MappingFile = Get-ExtensionMapping -Extension 'Autotask'
                     $MappedId = ($MappingFile | Where-Object { $_.RowKey -eq $TenantId }).IntegrationId
 
                     if (!$MappedId) { $MappedId = 1 } #This auto assigns to the AT base company.

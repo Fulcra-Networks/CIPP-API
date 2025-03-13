@@ -30,7 +30,6 @@ function New-IronScalestickets {
             "Autotask" {
                 If ($Configuration.Autotask.enabled) {
                     Write-LogMessage -API 'IronScales' -tenant 'none' -message 'Autotask is enabled. Sending IronScales tickets.' -Sev Info
-                    Get-AutotaskToken -configuration $Configuration.Autotask
 
                     foreach($company in $IronScalesIncidents) {
                         $ISCompany = $ISMappings | Where-Object { $_.IntegrationId -eq $company.Id }
