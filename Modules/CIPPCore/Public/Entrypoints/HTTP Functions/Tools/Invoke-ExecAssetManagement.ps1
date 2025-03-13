@@ -4,22 +4,26 @@ Function Invoke-ExecAssetManagement {
     [CmdletBinding()]
     param($Request, $TriggerMetadata)
 
-    <#Here we need to query the table which would have the matched/unmatched devices list#>
     $TenantFilter = $Request.Query.TenantFilter
     if ($Request.Query.TenantFilter -eq 'AllTenants') {
-        return 'Not Supported'
+        write-host "$('~'*60)>"
+        $body = 'All tenants not supported.'
     }
+    elseif([String]::IsNullOrEmpty($TenantFilter)){
+        $body = 'Empty tenant filter not supported.'
+    }
+    else {
+        $TblTenant = Get-CIPPTable -TableName Tenants
+        $Tenants = Get-CIPPAzDataTableEntity @TblTenant -Filter "PartitionKey eq 'Tenants'"
 
-    $TblTenant = Get-CIPPTable -TableName Tenants
-    $Tenants = Get-CIPPAzDataTableEntity @TblTenant -Filter "PartitionKey eq 'Tenants'"
-
-    $tenantId = $Tenants | Where-Object { $_.defaultDomainName -eq $TenantFilter } | Select-Object -ExpandProperty RowKey
+        $tenantId = $Tenants | Where-Object { $_.defaultDomainName -eq $TenantFilter } | Select-Object -ExpandProperty RowKey
 
 
-    $Table = Get-CIPPTable -TableName PSAAssetManagement
-    $rowData = Get-CIPPAzDataTableEntity @Table -Filter "PartitionKey eq '$tenantId'"
+        $Table = Get-CIPPTable -TableName PSAAssetManagement
+        $rowData = Get-CIPPAzDataTableEntity @Table -Filter "PartitionKey eq '$tenantId'"
 
-    $body = ($rowData.assetData|ConvertFrom-Json -Depth 10)
+        $body = ($rowData.assetData|ConvertFrom-Json -Depth 10)
+    }
 
     Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
         StatusCode = [HttpStatusCode]::OK
