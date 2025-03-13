@@ -14,8 +14,6 @@ Function Set-AssetManagementData {
         $APIName = 'Set PSA Asset Detail'
     )
 
-     Write-Host "$('-'*20)> Using >>$($TenantFilter)<< for tenant filter"
-
     if($TenantFilter -eq 'AllTenants') {
         return "Cannot run job for all Tenants."
     }
@@ -30,11 +28,14 @@ Function Set-AssetManagementData {
 
     $cfgPSA = Get-PSAConfig $Configuration
     if(!$cfgPSA){
+        Write-LogMessage -API 'Set-AssetManagementData' -message 'No PSA configured.' -sev Info
         return 'No PSA Configured'
     }
+
     $cfgRMM = Get-RMMConfig $Configuration
     if(!$cfgPSA){
-        return 'No PSA Configured'
+        Write-LogMessage -API 'Set-AssetManagementData' -message 'No RMM configured.' -sev Info
+        return 'No RMM Configured'
     }
 
     Switch ($cfgPSA.Name) {
@@ -112,6 +113,9 @@ Function Set-AssetManagementData {
     }
 
     $Table = Get-CIPPTable -TableName PSAAssetManagement
+    Get-CIPPAzDataTableEntity @Table -Filter "PartitionKey eq '$($tenantId)'" | ForEach-Object {
+        Remove-AzDataTableEntity -Force @Table -Entity $_
+    }
 
     Add-CIPPAzDataTableEntity @Table -Entity $AddObject -Force
 }
