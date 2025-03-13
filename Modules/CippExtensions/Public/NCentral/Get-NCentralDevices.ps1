@@ -13,9 +13,12 @@ Function Get-NCentralDevices {
     $customerId = $ExtensionMappings | Where-Object { $_.rowKey -eq $tenantId }
     $custDevices = Get-NCentralDevice -CustomerId $customerId.IntegrationId
 
-    #$devDetails[0].data.computersystem.serialnumber
+    #TODO: Move this to property mapping/extension config.
+    #This improves performance by removing non-managed systems (servers/printers/network equipment etc.)
+    $custDevices = $custDevices | Where-Object {$_.deviceClass -in @('Laptop - Windows','Workstations - Windows')}
+
     $results = @()
-    foreach($device in ($custDevices | Where-Object {$_.deviceClass -ne 'Other'})){
+    foreach($device in $custDevices){
         $DevDetail = Get-NCentralDeviceDetail -DeviceId $device.deviceId
         $fDetail = [PSCustomObject]@{
             Id = $device.deviceId
