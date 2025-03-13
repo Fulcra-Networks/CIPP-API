@@ -38,6 +38,9 @@ Function Set-AssetManagementData {
         return 'No RMM Configured'
     }
 
+    <#Expected object format
+        [string]name, [string]serial, [int]psaId, [int]rmmId, [string]contract
+    #>
     Switch ($cfgPSA.Name) {
         'Autotask' {
             $PSADevices = Get-AutotaskDevices -tenantId $tenantId
@@ -56,7 +59,6 @@ Function Set-AssetManagementData {
         }
     }
 
-    #Now create a merged list of devices
     $MatchedDevices = @()
     $UnmatchedPSADevices = @()
     $UnmatchedRMMDevices = @()
