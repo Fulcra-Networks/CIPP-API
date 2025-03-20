@@ -18,10 +18,10 @@ Function Invoke-ExecSetGroupTag {
         $body = @{
             groupTag = $Request.body.groupId.value
         } | ConvertTo-Json
-        New-GraphPOSTRequest -uri "https://graph.microsoft.com/beta/deviceManagement/windowsAutopilotDeviceIdentities/$($request.body.Device)/UpdateDeviceProperties" -tenantid $TenantFilter -body $body -method POST
+        New-GraphPOSTRequest -uri "https://graph.microsoft.com/beta/deviceManagement/windowsAutopilotDeviceIdentities/$($request.body.ID)/UpdateDeviceProperties" -tenantid $TenantFilter -body $body -method POST
         $Results = "Successfully assigned group tag $($Request.body.input) to $($Request.body.ID) for $($tenantfilter)"
     } catch {
-        $Results = "Could not assign group tag $($Request.body.input) to $($Request.body.device) for $($tenantfilter) Error: $($_.Exception.Message)"
+        $Results = "Could not assign group tag $($Request.body.input) to $($Request.body.ID) for $($tenantfilter) Error: $($_.Exception.Message)"
     }
     $Results = [pscustomobject]@{'Results' = "$results" }
     }
