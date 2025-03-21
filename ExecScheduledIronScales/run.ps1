@@ -13,5 +13,5 @@ try {
 }
 catch {
     Write-Host $($_.Exception.Message)
-    Write-LogMessage -API "Scheduler_IronScales" -tenant "none" -message "Could not start IronScales processing $($_.Exception.Message)" -sev Error
+    Write-LogMessage -API "Scheduler_IronScales" -tenant "none" -message "AAAACould not start IronScales processing $($_.Exception.Message)" -sev Error
 }

@@ -24,7 +24,7 @@ function Get-IronScalesToken {
         "scopes" = $scopes
     }
     try {
-        $resp = Invoke-RestMethod -Method Post -ContentType "application/json" -Uri "$($Configuration.ApiHost+$is_endpoint.auth)" -Body $($body|ConvertTo-Json) 
+        $resp = Invoke-RestMethod -Method Post -ContentType "application/json" -Uri "$($Configuration.Ironscales.ApiHost+$is_endpoint.auth)" -Body $($body|ConvertTo-Json)
         return $resp.jwt
     }
     catch {
