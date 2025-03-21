@@ -115,10 +115,10 @@ function Get-TicketQueryFilter {
 function Get-IronScalesIncidents {
     param($configuration)
 
-    $SCRIPT:apiHost = $configuration.ApiHost
-    $SCRIPT:JWT = Get-IronScalesToken -configuration $configuration
+    $SCRIPT:apiHost = $configuration.IronScales.ApiHost
+    $SCRIPT:JWT = Get-IronScalesToken -configuration $configuration.IronScales
 
-    Get-AutotaskToken -configuration $Configuration.Autotask
+    Get-AutotaskToken -configuration $configuration.Autotask
 
     if($SCRIPT:Companies.Length -eq 0){
         Get-Companies
