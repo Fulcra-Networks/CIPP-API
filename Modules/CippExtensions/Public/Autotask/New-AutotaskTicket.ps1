@@ -40,7 +40,7 @@ function New-AutotaskTicket {
         $ticket.billingCodeID           = "29682801"            #Worktype = remote
 
         $t = New-AutotaskAPIResource -Resource Tickets -Body $ticket
-        Write-LogMessage -API 'Autotask' -tenant $TenantFilter -message "Created autotask ticket: $t" -sev info
+        Write-LogMessage -API 'Autotask' -tenant $TenantFilter -message "Created autotask ticket: $t" -sev Debug
     }
     catch {
         Write-LogMessage -API 'Autotask' -tenant 'none' -message "Error creating ticket. $($_.Exception.Message)" -Sev Error

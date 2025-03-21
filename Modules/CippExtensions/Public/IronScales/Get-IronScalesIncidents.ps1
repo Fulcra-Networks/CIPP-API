@@ -29,7 +29,7 @@ function New-IronScalestickets {
         switch ($ConfigItem) {
             "Autotask" {
                 If ($Configuration.Autotask.enabled) {
-                    Write-LogMessage -API 'IronScales' -tenant 'none' -message 'Autotask is enabled. Sending IronScales tickets.' -Sev Info
+                    Write-LogMessage -API 'IronScales' -tenant 'none' -message 'Autotask is enabled. Sending IronScales tickets.' -Sev Debug
 
                     foreach($company in $IronScalesIncidents) {
                         $ISCompany = $ISMappings | Where-Object { $_.IntegrationId -eq $company.Id }
@@ -40,12 +40,12 @@ function New-IronScalestickets {
                             continue
                         }
                         else {
-                            Write-LogMessage -API 'IronScales' -tenant 'None' -message "Creating Autotask ticket for IronScales company $($company.customername)" -Sev Info
+                            Write-LogMessage -API 'IronScales' -tenant 'None' -message "Creating Autotask ticket for IronScales company $($company.customername)" -Sev Debug
                             $tTitle = "[IronScales] New Incident(s) for $($company.CustomerName)"
 
                             try{
                             if(Get-ExistingTicket $tTitle){
-                                Write-LogMessage -API 'IronScales' -tenant 'none' -message "An existing Autotask ticket was found for $($company.customername)" -Sev Info
+                                Write-LogMessage -API 'IronScales' -tenant 'none' -message "An existing Autotask ticket was found for $($company.customername)" -Sev Debug
                                 continue
                             }
                             }
