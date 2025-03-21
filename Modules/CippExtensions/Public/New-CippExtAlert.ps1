@@ -26,7 +26,7 @@ function New-CippExtAlert {
                     New-AutotaskTicket `
                         -Title $Alert.AlertTitle `
                         -Description $AlertText `
-                        -atCompanyId $mappedId `
+                        -atCompany $mappedId `
                         -issueType "29" `
                         -subIssueType "327" #Service Management/Other
                 }
