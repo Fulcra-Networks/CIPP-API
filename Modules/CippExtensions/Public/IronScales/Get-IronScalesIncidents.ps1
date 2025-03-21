@@ -40,7 +40,7 @@ function New-IronScalestickets {
                             continue
                         }
                         else {
-                            Write-LogMessage -API 'IronScales' -tenant 'none' -message "Creating Autotask ticket for IronScales company $($company.customername)" -Sev Info
+                            Write-LogMessage -API 'IronScales' -tenant 'None' -message "Creating Autotask ticket for IronScales company $($company.customername)" -Sev Info
                             $tTitle = "[IronScales] New Incident(s) for $($company.CustomerName)"
 
                             if(Get-ExistingTicket $tTitle){
@@ -50,6 +50,7 @@ function New-IronScalestickets {
 
                             $body = Get-BodyForTicket $company
                             $estHr = 0.1*$company.Incidents.Count
+
                             New-AutotaskTicket -atCompany $ATCompany.IntegrationId `
                                 -title $tTitle `
                                 -description ($body|Join-String) `

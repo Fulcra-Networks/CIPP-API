@@ -18,6 +18,9 @@ function New-AutotaskTicket {
             $description = Convert-HtmlTableToPlainText $description
         }
 
+
+        Write-LogMessage -api 'Autotask' -tenant 'None' -message "Creating ticket with parameters: $atCompanyId,$title,$($description.substring(0,30)),$estHr,$issueType,$subIssueType,$ticketType,$priority" -Sev Info
+
         $ticket = New-AutotaskBody -Resource Tickets -NoContent
         $ticket.Id                      = "0"                   #Always 0 for a new ticket
         $ticket.ticketType              = "1"
@@ -37,7 +40,7 @@ function New-AutotaskTicket {
         $ticket.billingCodeID           = "29682801"            #Worktype = remote
 
         $t = New-AutotaskAPIResource -Resource Tickets -Body $ticket
-        Write-LogMessage -API 'Webhook Alerts' -tenant $TenantFilter -message "Created autotask ticket: $t" -sev info
+        Write-LogMessage -API 'Autotask' -tenant $TenantFilter -message "Created autotask ticket: $t" -sev info
     }
     catch {
         Write-LogMessage -API 'Autotask' -tenant 'none' -message "Error creating ticket. $($_.Exception.Message)" -Sev Error
