@@ -43,9 +43,14 @@ function New-IronScalestickets {
                             Write-LogMessage -API 'IronScales' -tenant 'None' -message "Creating Autotask ticket for IronScales company $($company.customername)" -Sev Info
                             $tTitle = "[IronScales] New Incident(s) for $($company.CustomerName)"
 
+                            try{
                             if(Get-ExistingTicket $tTitle){
                                 Write-LogMessage -API 'IronScales' -tenant 'none' -message "An existing Autotask ticket was found for $($company.customername)" -Sev Info
                                 continue
+                            }
+                            }
+                            catch {
+                                Write-LogMessage -API 'IronScales' -tenant 'none' -message "Error looking up existing tickets. $($_.Exception.Message)" -Sev Error
                             }
 
                             $body = Get-BodyForTicket $company
@@ -112,6 +117,8 @@ function Get-IronScalesIncidents {
 
     $SCRIPT:apiHost = $configuration.ApiHost
     $SCRIPT:JWT = Get-IronScalesToken -configuration $configuration
+
+    Get-AutotaskToken -configuration $Configuration.Autotask
 
     if($SCRIPT:Companies.Length -eq 0){
         Get-Companies
