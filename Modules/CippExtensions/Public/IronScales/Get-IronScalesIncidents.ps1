@@ -17,8 +17,6 @@ function New-IronScalestickets {
         return
     }
 
-    $MappingTable = Get-CIPPTable -TableName CippMapping
-
     $ATMappings = Get-ExtensionMapping -Extension 'Autotask'
     $ISMappings = Get-ExtensionMapping -Extension 'IronScales'
 

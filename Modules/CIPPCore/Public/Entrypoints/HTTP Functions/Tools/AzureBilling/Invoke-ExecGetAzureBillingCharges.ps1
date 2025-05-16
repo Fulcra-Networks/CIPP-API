@@ -1,0 +1,494 @@
+using namespace System.Net
+
+[string]$baseURI = ''
+
+function Invoke-ExecGetAzureBillingCharges {
+    [CmdletBinding()]
+    param($Request, $TriggerMetadata)
+
+
+    if ([String]::IsNullOrEmpty($request.Query.date)) {
+        $body = @("No date set")
+        Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
+            StatusCode = [HttpStatusCode]::BadRequest
+            Body       = $body
+        })
+        return  # Short-circuit the function
+    }
+
+    $CtxExtensionCfg = Get-CIPPTable -TableName Extensionsconfig
+    $CfgExtensionTbl = (Get-CIPPAzDataTableEntity @CtxExtensionCfg).config | ConvertFrom-Json -Depth 10
+
+    $SCRIPT:baseURI = $CfgExtensionTbl.AzureBilling.baseURI
+
+    if(-not $CfgExtensionTbl.AzureBilling){
+        $body = @("Extension is not configured")
+        Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
+            StatusCode = [HttpStatusCode]::BadRequest
+            Body       = $body
+        })
+        return  # Short-circuit the function
+    }
+
+    try{
+        $secrets = GetSecrets
+    }
+    catch {
+        Write-Host "$('*'*60)Error getting secrets"
+        Write-LogMessage -sev Error -API 'Azure Billing' -message 'Attempted to run Azure billing with no storage mapping'
+        $body= @("Error could not get secrets.")
+        Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
+            StatusCode = [HttpStatusCode]::BadRequest
+            Body       = $body
+        })
+        return
+    }
+
+    if([string]::IsNullOrEmpty($secrets.AzBillingConnStr)){
+        Write-LogMessage -sev Error -API 'Azure Billing' -message 'Attempted to run Azure billing with no storage mapping'
+        $body= @("Error could not connect to storage.")
+        Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
+            StatusCode = [HttpStatusCode]::BadRequest
+            Body       = $body
+        })
+        return
+    }
+    if([string]::IsNullOrEmpty($secrets.ArrowSecret)){
+        Write-LogMessage -sev Error -API 'Azure Billing' -message 'Attempted to run Azure billing with no Arrow Secret'
+        $body= @("Error could not connect to Arrow.")
+        Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
+            StatusCode = [HttpStatusCode]::BadRequest
+            Body       = $body
+        })
+        return
+    }
+    if([string]::IsNullOrEmpty($secrets.ArrowAuthKey)){
+        Write-LogMessage -sev Error -API 'Azure Billing' -message 'Attempted to run Azure billing with no Arrow Auth Key'
+        $body= @("Error could not connect to Arrow.")
+        Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
+            StatusCode = [HttpStatusCode]::BadRequest
+            Body       = $body
+        })
+        return
+    }
+
+    try{
+        $billingContext = Get-AzTableContext -connectionStr $secrets.AzBillingConnStr
+        $atMappingContext = Get-CIPPTable -tablename AutotaskAzureMapping
+        $atUnmappedContext = Get-CIPPTable -tablename AutotaskAzureUnmappedCharges
+        $atMappingRows = Get-CIPPAzDataTableEntity @atMappingContext
+
+        if($atMappingRows.count -eq 0){
+            Write-LogMessage -sev Info -API 'Azure Billing' -message "Got no rows from AutotaskAzureMapping"
+        }
+
+        if([bool]::Parse($request.Query.rerunJob)){
+            Write-LogMessage -sev Info -API "Azure Billing" -message "Rerun billing job requested. $($Request.Query.rerunJob)"
+        }
+
+        $body = @()
+
+        $existingData = Get-ExistingBillingData -table $billingContext -date $request.Query.date
+
+        if($existingData.count -gt 0 -and [bool]::Parse($request.Query.rerunJob) -eq $false){
+            Write-LogMessage -sev Info -API "Azure Billing" -message "Existing records found and rerun not requested."
+            $mappedUnmapped = Get-MappedUnmappedCharges -azMonthSplit $existingData -body $body -atMapping $atMappingRows
+            $body = $mappedUnmapped.mapped
+            Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
+                StatusCode = [HttpStatusCode]::OK
+                Body       = $body
+            })
+            return
+        }
+
+        $monthFilter = ([DateTime]::ParseExact($request.Query.date,'yyyyMMdd',$null).ToString('yyyy-MM'))
+
+        $hdrAuth = @{apikey = $secrets.ArrowAuthKey; secret = $secrets.ArrowSecret}
+
+        $customers = GetArrowCustomers -hdrAuth $hdrAuth
+
+        $targetSKUs = $CfgExtensionTbl.AzureBilling.SKU.split(',')
+
+        foreach ($cust in $customers){
+            if ($cust.Reference -match $CfgExtensionTbl.AzureBilling.ExcludeCust) {
+                continue
+            }
+
+            $subscriptions = GetCustLicenses -custId $cust.Reference -hdrAuth $hdrAuth
+            $subscriptions = $subscriptions |Where-Object {$targetSKUs -contains $_.sku} #"MS-AZR-0145P"
+
+            foreach ($sub in $subscriptions) {
+                $conMonth = GetConsumptionMonthly -License $sub.license_id -hdrAuth $hdrAuth -MonthStart $monthFilter -MonthEnd $monthFilter
+
+                if ($conMonth.data.list.dataProvider.status -match 'consumed_valid') {
+                    $azMonthSplit = GetAzureConsumptionMonthSplit -License $sub.license_id -Subscription $sub -Customer $cust -GroupBy "resource group" -hdrAuth $hdrAuth -MonthStart $monthFilter -MonthEnd $monthFilter
+
+                    Write-ChargesToTable -table $billingContext -charges $azMonthSplit -rerun $Request.Query.rerunJob
+                }
+            }
+        }
+
+        $data = Get-ExistingBillingData -table $billingContext -date $request.Query.date
+        $mappedUnmapped = Get-MappedUnmappedCharges -azMonthSplit $data -body $body -atMapping $atMappingRows
+        $body = $mappedUnmapped.mapped
+
+        Write-UnmappedToTable -table $atUnmappedContext -unmappedcharges $mappedUnmapped.unmapped
+    }
+    catch{
+        Write-LogMessage -sev Error -API 'Azure Billing' -message "$($_.Exception.Message)"
+        $body = @("Error getting billing data. Details have been logged.")
+    }
+
+    Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
+        StatusCode = [HttpStatusCode]::OK
+        Body       = $body
+    })
+}
+
+<# This is able to use custom AzStora#>
+function Get-AzTableContext
+{
+    param($connectionStr)
+    $billingContext = New-AzDataTableContext -ConnectionString $connectionStr -TableName "ArrowAzMonthlySplitRG"
+    New-AzDataTable -Context $billingContext | Out-Null
+
+    @{
+        Context = $billingContext
+    }
+}
+
+function Get-MappedUnmappedCharges {
+    param($azMonthSplit, $body, $atMapping)
+
+
+    $unmappedCharges=@()
+
+    $atMappingHashTable = @{}
+    $atMapping| ForEach-Object {
+        if([string]::IsNullOrEmpty($_.PartitionKey) -or [string]::IsNullOrEmpty($_.paxResourceGroupName)) {
+            Write-Host "$('*'*60) Empty PartitionKey or paxResourceGroupName..."
+        }
+        else {
+            $join = ("$($_.PartitionKey.Trim()) - $($_.paxResourceGroupName.Trim())").ToUpper()
+            $atMappingHashTable[$join] = $_
+        }
+    }
+
+    #Expected final columns
+    #chargeDate	customerId	customer	ResourceGroup	price	Vendor	cost	atCustId	allocationCodeId	chargeName	contractId	appendGroup	billableToAccount	atSumGroup
+    $azMonthSplit | ForEach-Object {
+        $join = ("$($_.licenseRef.Trim()) - $($_.group.Trim())").ToUpper()
+
+        if($null -ne $_.PartitionKey){
+            $chargeDate = [DateTime]::ParseExact("$($_.PartitionKey)-28",'yyyy-MM-dd',$null).ToString("MM/dd/yyyy")
+        }
+        else {
+            Write-Host "$('*'*60) Bad chargedate value"
+            continue
+        }
+
+        if($atMappingHashTable.Contains($join)){
+            $mapping = $atMappingHashTable[$join]
+
+            if($mapping.billableToAccount){
+
+                $body += @{
+                    chargeDate          = $chargeDate
+                    customerId          = $_.customerRef
+                    customer            = $_.customer
+                    subscriptionId      = $_.licenseRef
+                    "Resource Group"    = ($_.group.toupper())
+                    price               = $_.totalList
+                    cost                = $_.totalReseller
+                    vendor              = "Arrow"
+                    atCustId            = $mapping.atCustId
+                    allocationCodeId    = $mapping.allocationCodeId
+                    chargeName          = $mapping.chargeName
+                    appendGroup         = $mapping.appendGroup
+                    contractId          = $mapping.contractId
+                    billableToAccount   = $mapping.billableToAccount
+                    atSumGroup          = $mapping.atSumGroup
+                }
+            }
+        }
+        else {
+            $unmappedCharges += @{
+                chargeDate          = $chargeDate
+                customerId          = $_.customerRef
+                customer            = $_.customer
+                subscriptionId      = $_.licenseRef
+                "Resource Group"    = ($_.group.toupper())
+                price               = $_.totalList
+                cost                = $_.totalReseller
+                vendor              = "Arrow"
+            }
+        }
+    }
+
+    return @{mapped=$body;unmapped=$unmappedCharges}
+}
+
+function Write-ChargesToTable {
+    param($table,$charges, $rerun)
+
+    foreach ($line in $azMonthSplit.lines) {
+
+        try {
+            Write-Host "$('*'*60)Writing Mapped to storage table, Resource Group: $($line.group)"
+
+            switch ($($line.group)) {
+                "N/A" {$line.group = "NA"; break}
+            }
+
+            $AddObject = @{
+                PartitionKey= $line.month
+                RowKey = "$($line.licenseRef) - $($line.group)"
+                currency = $line.currency
+                customer = $line.customer
+                customerRef = $line.customerRef
+                group = $line.group
+                licenseRef = $line.licenseRef
+                totalCustomer = $line.totalCustomer
+                totalList = $line.totalList
+                totalReseller = $line.totalReseller
+            }
+
+
+            if([bool]::Parse($rerun)){
+                Add-CIPPAzDataTableEntity @table -Entity $AddObject -Force
+            }
+            else{
+                Add-CIPPAzDataTableEntity @table -Entity $AddObject
+            }
+            Write-LogMessage -sev Debug -API 'Azure Billing' -message "Added azure billing for $($line.customer)"
+        } catch {
+            Write-LogMessage -sev Error -API 'Azure Billing' -message "Error writing charges to table $($_.Exception.Message)"
+        }
+    }
+}
+
+function Write-UnmappedToTable {
+    param($table,$unmappedcharges)
+
+    foreach ($line in $unmappedcharges) {
+        try {
+            $AddObject = @{
+                PartitionKey= ($line.chargeDate.replace('/','-'))
+                RowKey = "$($line.subscriptionId) - $($line."Resource Group")"
+                customer = $line.customer
+                subscriptionId = $line.subscriptionId
+                "Resource Group"= $line."Resource Group"
+                price = $line.price
+                cost = $line.cost
+                vendor = $line.vendor
+            }
+
+            Add-CIPPAzDataTableEntity @table -Entity $AddObject -Force
+            Write-LogMessage -sev Debug -API 'Azure Billing' -message "Added unmapped billing for $($line.customer)"
+        } catch {
+            Write-LogMessage -sev Error -API 'Azure Billing' -message "Error writing charges to table $($_.Exception.Message)"
+        }
+    }
+}
+
+function Get-ExistingBillingData {
+    param($table,$date)
+    $existingData = @()
+
+    $Filter = "PartitionKey eq '$([DateTime]::ParseExact($date,'yyyyMMdd',$null).ToString('yyyy-MM'))'"
+    $existingData = Get-CIPPAzDataTableEntity @table -filter $Filter
+
+    return $existingData
+}
+
+function GetArrowCustomers {
+    param(
+        [string] $reference = "",
+        [Parameter(Mandatory=$true)]$hdrAuth
+    )
+
+    $uriSuffix = "/index.php/api/customers/$reference"
+
+    try {
+        $resp = Invoke-RestMethod -Uri ($baseURI+$uriSuffix) -Method "GET" `
+            -ContentType "application/json" `
+            -Headers $hdrAuth
+
+        if (-not $resp.data.customers) {
+            Write-LogMessage -sev Error -API 'Azure Billing' -message "No customers found in response."
+            return
+        }
+
+        return ($resp.data.customers)
+    } catch {
+        Write-LogMessage -sev Error -API 'Azure Billing' -message "Error in GetArrowCustomers: $($_.Exception.Message)"
+        return @()
+    }
+}
+
+function GetCustLicenses {
+    param(
+        [string] $custId = "",
+        [string] $sku = "",
+        [string] $state = "", #"active",
+        [Parameter(Mandatory=$true)]$hdrAuth
+
+    )
+
+    $uriSuffix = "/index.php/api/customers/$custId/licenses?state=$state"
+
+    if ($sku -ne "") {
+        $uriSuffix += "&sku=$sku"
+    }
+
+    $resp = Invoke-RestMethod -Uri ($baseURI+$uriSuffix) -Method "GET" `
+        -ContentType "application/json" `
+        -Headers $hdrAuth
+
+    return $resp.data.licenses
+}
+
+function GetConsumptionMonthly {
+    param(
+        [string] $License = "XSP1703764",
+        [string] $MonthStart = [DateTime]::Now.AddMonths(-1).ToString("yyyy-MM"),
+        [string] $MonthEnd = [DateTime]::Now.AddMonths(-1).ToString("yyyy-MM"),
+        [Parameter(Mandatory=$true)]$hdrAuth
+    )
+
+    try{
+        $uriSuffix = "/index.php/api/consumption/license/$($License)/monthly/?billingMonthStart=$($MonthStart)&billingMonthEnd=$($MonthEnd)"
+        $resp = Invoke-RestMethod -Uri ($baseURI+$uriSuffix) -Method "GET" `
+            -ContentType "application/json" `
+            -Headers $hdrAuth
+
+        return $resp
+    }
+    catch{
+        Write-LogMessage -sev Error -API 'Azure Billing' -message "Error in GetConsumptionMonthly: billingMonthStart=$($MonthStart)&billingMonthEnd=$($MonthEnd) $($_.Exception.Message)"
+        return $null
+    }
+}
+
+function GetAzureConsumptionMonthSplit {
+    param(
+        [string] $GroupBy = "resource group",
+        [string] $License = "XSP1703764",
+        [string] $MonthStart = [DateTime]::Now.AddMonths(-1).ToString("yyyy-MM"),
+        [string] $MonthEnd = [DateTime]::Now.AddMonths(-1).ToString("yyyy-MM"),
+        $Subscription,
+        $Customer,
+        [Parameter(Mandatory=$true)]$hdrAuth
+    )
+
+    try {
+        $uriSuffix = "/index.php/api/consumption/license/$($License)/monthlySplit/?group_by=$($GroupBy)&billingMonthStart=$($MonthStart)&billingMonthEnd=$($MonthEnd)"
+
+        $azMonth = [azConsumptionMonthSplit]::new()
+        $azMonth.groupBy = $GroupBy
+        $resp = Invoke-RestMethod -Uri ($baseURI+$uriSuffix) -Method "GET" `
+            -ContentType "application/json" `
+            -Headers $hdrAuth
+
+        $i = 0
+        foreach($line in $resp.data.list.dataProvider) {
+            $azLine = [azConsumptionMonthSplitLines]::new()
+            $azLine.customer = $Customer.CompanyName
+            $azLine.customerRef = $Customer.Reference
+            $azLine.month = $MonthStart
+            $azLine.licenseRef = $Subscription.license_id
+            $azLine.currency = $resp.data.list.currency
+            $azLine.totalCustomer = $resp.data.customer.dataProvider[$($i)].consumption
+            $azLine.totalList = $resp.data.list.dataProvider[$($i)].consumption
+            $azLine.totalReseller = $resp.data.reseller.dataProvider[$($i)].consumption
+            $azLine.group = $resp.data.list.dataProvider[$($i)].group_by
+            $azMonth.lines += $azLine
+            $i++
+        }
+
+
+        return $azMonth
+    }
+    catch {
+        Write-LogMessage -sev Error -API 'Azure Billing' -message "Error in GetAzureConsumptionMonthSplit: $($_.Exception.Message)"
+        return $null
+    }
+}
+
+function GetSecrets {
+    $secrets = @{
+        AzBillingConnStr=""
+        ArrowSecret=""
+        ArrowAuthKey=""
+    }
+
+    if (!$ENV:AzBillingConnStr) {
+        $null = Connect-AzAccount -Identity
+        $secrets.AzBillingConnStr = (Get-AzKeyVaultSecret -VaultName $ENV:WEBSITE_DEPLOYMENT_ID -Name 'AzStorageConnStr' -AsPlainText)
+    } else {
+        $secrets.AzBillingConnStr = $ENV:AzBillingConnStr
+    }
+    if (!$ENV:ArrowSecret) {
+        $null = Connect-AzAccount -Identity
+        $secrets.ArrowSecret = (Get-AzKeyVaultSecret -VaultName $ENV:WEBSITE_DEPLOYMENT_ID -Name 'ArrowSecret' -AsPlainText)
+    } else {
+        $secrets.ArrowSecret = $ENV:ArrowSecret
+    }
+    if (!$ENV:ArrowAuthKey) {
+        $null = Connect-AzAccount -Identity
+        $secrets.ArrowAuthKey = (Get-AzKeyVaultSecret -VaultName $ENV:WEBSITE_DEPLOYMENT_ID -Name 'ArrowAuthKey' -AsPlainText)
+    } else {
+        $secrets.ArrowAuthKey = $ENV:ArrowAuthKey
+    }
+
+    return $secrets
+}
+
+class consumptionMonthLine {
+    [string]$Month
+    [string]$UOM
+    [string]$Region
+    [string]$CountryCurrencyCode
+    [decimal]$CountryCustomerUnit
+    [decimal]$LevelChargeableQuantity
+    [string]$VendorProductName
+    [string]$ResourceGroup
+    [string]$VendorRessourceSKU
+    [string]$VendorMeterCategory
+    [string]$VendorMeterSubCategory
+
+    # Constructor
+    consumptionMonthLine ([string]$Month, [string]$UOM, [string]$Region, [string]$CountryCurrencyCode, [string]$CountryCustomerUnit, [string]$LevelChargeableQuantity, [string]$VendorProductName, [string]$ResourceGroup, [string]$VendorRessourceSKU, [string]$VendorMeterCategory, [string]$VendorMeterSubCategory)
+    {
+        $this.Month = $Month
+        $this.UOM = $UOM
+        $this.Region = $Region
+        $this.CountryCurrencyCode = $CountryCurrencyCode
+        $this.CountryCustomerUnit = $CountryCustomerUnit
+        $this.LevelChargeableQuantity = $LevelChargeableQuantity
+        $this.VendorProductName = $VendorProductName
+        $this.ResourceGroup = $ResourceGroup
+        $this.VendorRessourceSKU = $VendorRessourceSKU
+        $this.VendorMeterCategory = $VendorMeterCategory
+        $this.VendorMeterSubCategory = $VendorMeterSubCategory
+    }
+
+}
+
+class azConsumptionMonthSplitLines {
+    [string]$customer
+    [string]$customerRef
+    [string]$licenseRef
+    [string]$currency
+    [decimal]$totalCustomer
+    [decimal]$totalList
+    [decimal]$totalReseller
+    [string]$month
+    [string]$group
+}
+
+class azConsumptionMonthSplit {
+    [string]$groupBy
+    #[string]$month
+    [azConsumptionMonthSplitLines[]]$lines
+}

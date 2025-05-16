@@ -4969,6 +4969,78 @@
         }
       }
     },
+    "/ExecGetAzureBillingCharges":{
+      "get":{
+        "description":"GetAzureBillingCharges",
+        "summary": "GetAzureBillingCharges",
+        "tags": [],
+        "parameters": [
+          {
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "name": "TenantFilter",
+            "in": "query"
+          },
+          {
+            "required": true,
+            "schema": { "type":"string"},
+            "name":"date",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {},
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful operation"
+          }
+        }
+      }
+    },
+    "/ExecGetAzureUnmappedCharges":{
+      "get":{
+        "description":"GetAzureUnmappedCharges",
+        "summary": "GetAzureUnmappedCharges",
+        "tags": [],
+        "parameters": [
+          {
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "name": "TenantFilter",
+            "in": "query"
+          },
+          {
+            "required": true,
+            "schema": { "type":"string"},
+            "name":"date",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {},
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful operation"
+          }
+        }
+      }
+    },
     "/ListAppStatus": {
       "get": {
         "description": "ListAppStatus",
