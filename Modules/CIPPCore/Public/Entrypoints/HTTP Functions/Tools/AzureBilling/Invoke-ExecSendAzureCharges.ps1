@@ -10,6 +10,9 @@ function Invoke-ExecSendAzureCharges {
     $CtxExtensionCfg = Get-CIPPTable -TableName Extensionsconfig
     $CfgExtensionTbl = (Get-CIPPAzDataTableEntity @CtxExtensionCfg).config | ConvertFrom-Json -Depth 10
 
+    $SentChargesTable = Get-CIPPTable -TableName AzureBillingChargesSent
+
+    Get-AutotaskToken -configuration $CfgExtensionTbl.Autotask
 
     if (!$ENV:AzBillingConnStr) {
         $null = Connect-AzAccount -Identity
@@ -33,18 +36,95 @@ function Invoke-ExecSendAzureCharges {
 
     $existingData = Get-BillingData -table $billingContext -date $billingDate
 
+    <# TODO - AzureBillingChargesSent table duplicate checking
+    The 'sent charges table' having the charge date row key should cause the application to kick out an error.
+    This will help prevent duplicate charges being sent, however a situation could arise where a charge would
+    be sent for a month but potentially a billing issue at Arrow etc. could cause use to have to wait to send
+    the second charge.
+    Alternatively we could use the group/charge name and contract ID to prevent duplicates.
+    #>
+
+
     $body = @()
     $charges = Get-MappedChargesToSend -azMonthSplit $existingData -body $body -atMapping $atMappingRows
 
+    $results = @()
+    foreach($charge in $charges){
+        try{
+            Write-Host "$('*'*60) $($charge.cost.gettype())"
+            $atCharge = New-AutotaskBody -Resource ContractCharges -NoContent
+            if($charge.appendGroup) { $atCharge.name = "$($charge.chargeName) - $($charge."Resource Group")" }
+            else { $atCharge.name = $charge.ChargeName }
+            $atCharge.contractID            = $charge.contractId
+            $atCharge.billingCodeID         = $charge.allocationCodeId
+            $atCharge.isBillableToCompany   = $charge.billableToAccount
+            $atCharge.unitCost              = [decimal]::round($charge.cost,2)
+            $atCharge.unitPrice             = [decimal]::round($charge.price,2)
+            $atCharge.datePurchased         = $charge.chargeDate
+            $atCharge.chargeType            = 1 # Operational
+            $atCharge.status                = 6 # Delivered/Shipped Full
+            $atCharge.unitQuantity          = 1
 
-    Write-Host "$('*'*60)"
-    Write-Host "$($charges|ConvertTo-Json -Depth 10)"
-    Write-Host "$('*'*60)"
+            #New-AutotaskAPIResource -Resource ContractCharges -Body $atCharge
+            $results += $atCharge
+
+            $sentCharge = @{
+                PartitionKey = $charge.chargeDate.ToString("yyyy-MM-dd") # Get-MappedChargesToSend returns a datetime object.
+                RowKey       = "$($charge.customerId) - $($charge."Resource Group")"
+                ContractId   = $charge.contractId
+                Customer     = $charge.customer
+                cost         = $charge.cost
+                price        = $charge.price
+            }
+
+            Write-Host "$('*'*60)"
+            Write-Host "$($atCharge)"
+            Write-Host "$($sentCharge|ConvertTo-Json)"
+            Write-Host "$('*'*60)"
+
+            Add-CIPPAzDataTableEntity @SentChargesTable -Entity $sentCharge -Force
+        }
+        catch {
+            Write-LogMessage -sev Error -API "Azure Billing" -message "Error sending charge: $($_.Exception.Message)"
+        }
+    }
+
+    # Write-Host "$('*'*60)"
+    # Write-Host "$($charges|ConvertTo-Json -Depth 10)"
+    # Write-Host "$('*'*60)"
 
     Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
             StatusCode = [HttpStatusCode]::OK
-            Body       = @($charges)
+            Body       = "Sent $($results.count) of $($charges.count) charges."
     })
+}
+
+function bleh{
+    foreach ($row in $rows) {
+
+    if ($row.appendGroup -eq "1") { $chargeName = $row.chargeName + " - " + $row.ResourceGroup } else { $chargeName = $row.chargeName }
+    if ($row.billableToAccount -eq "1") {$billable = $true} else {$billable = $false}
+
+    try {
+        #[datetime]$datepurchased = $(Get-Date($row.invoice_date))
+        #[string]$datepurchased = $row.invoice_date
+        #Write-Output "Date: $datepurchased"
+        $contractCost = New-AtwsContractCost -ContractID $row.contractId `
+            -CostType Operational `
+            -DatePurchased $row.chargeDate `
+            -Name $chargeName `
+            -UnitQuantity 1 `
+            -UnitCost $row.cost `
+            -UnitPrice $row.price `
+            -AllocationCodeID $row.allocationCodeId `
+            -Status "Delivered/Shipped Full" `
+            -BillableToAccount $billable
+
+        $newEntries += $contractCost
+    } catch {
+        Write-Error $_.Exception.message
+    }
+}
 }
 
 function Get-BillingData {
@@ -77,7 +157,7 @@ function Get-MappedChargesToSend {
         $join = ("$($_.licenseRef.Trim()) - $($_.group.Trim())").ToUpper()
 
         if($null -ne $_.PartitionKey){
-            $chargeDate = [DateTime]::ParseExact("$($_.PartitionKey)-28",'yyyy-MM-dd',$null).ToString("MM/dd/yyyy")
+            $chargeDate = [DateTime]::ParseExact("$($_.PartitionKey)-28",'yyyy-MM-dd',$null)
         }
         else {
             Write-Host "$('*'*60) Bad chargedate value"
@@ -96,7 +176,7 @@ function Get-MappedChargesToSend {
                     "Resource Group"    = ($_.group.toupper())
                     price               = $_.totalList
                     cost                = $_.totalReseller
-                    vendor              = "Arrow"
+                    vendor              = "Arrow" # TODO - Set this via the billing extension config options.
                     atCustId            = $mapping.atCustId
                     allocationCodeId    = $mapping.allocationCodeId
                     chargeName          = $mapping.chargeName
