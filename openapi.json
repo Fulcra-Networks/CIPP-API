@@ -5077,6 +5077,42 @@
         }
       }
     },
+    "/ExecGetSentAzureCharges":{
+      "get":{
+        "description":"GetSentAzureCharges",
+        "summary": "GetSentAzureCharges",
+        "tags": [],
+        "parameters": [
+          {
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "name": "TenantFilter",
+            "in": "query"
+          },
+          {
+            "required": false,
+            "schema": { "type":"string"},
+            "name":"date",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {},
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful operation"
+          }
+        }
+      }
+    },
     "/ListAppStatus": {
       "get": {
         "description": "ListAppStatus",
