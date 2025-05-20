@@ -51,7 +51,6 @@ function Invoke-ExecSendAzureCharges {
     $results = @()
     foreach($charge in $charges){
         try{
-            Write-Host "$('*'*60) $($charge.cost.gettype())"
             $atCharge = New-AutotaskBody -Resource ContractCharges -NoContent
             if($charge.appendGroup) { $atCharge.name = "$($charge.chargeName) - $($charge."Resource Group")" }
             else { $atCharge.name = $charge.ChargeName }
@@ -77,11 +76,6 @@ function Invoke-ExecSendAzureCharges {
                 price        = $charge.price
             }
 
-            Write-Host "$('*'*60)"
-            Write-Host "$($atCharge)"
-            Write-Host "$($sentCharge|ConvertTo-Json)"
-            Write-Host "$('*'*60)"
-
             Add-CIPPAzDataTableEntity @SentChargesTable -Entity $sentCharge -Force
         }
         catch {
@@ -97,34 +91,6 @@ function Invoke-ExecSendAzureCharges {
             StatusCode = [HttpStatusCode]::OK
             Body       = "Sent $($results.count) of $($charges.count) charges."
     })
-}
-
-function bleh{
-    foreach ($row in $rows) {
-
-    if ($row.appendGroup -eq "1") { $chargeName = $row.chargeName + " - " + $row.ResourceGroup } else { $chargeName = $row.chargeName }
-    if ($row.billableToAccount -eq "1") {$billable = $true} else {$billable = $false}
-
-    try {
-        #[datetime]$datepurchased = $(Get-Date($row.invoice_date))
-        #[string]$datepurchased = $row.invoice_date
-        #Write-Output "Date: $datepurchased"
-        $contractCost = New-AtwsContractCost -ContractID $row.contractId `
-            -CostType Operational `
-            -DatePurchased $row.chargeDate `
-            -Name $chargeName `
-            -UnitQuantity 1 `
-            -UnitCost $row.cost `
-            -UnitPrice $row.price `
-            -AllocationCodeID $row.allocationCodeId `
-            -Status "Delivered/Shipped Full" `
-            -BillableToAccount $billable
-
-        $newEntries += $contractCost
-    } catch {
-        Write-Error $_.Exception.message
-    }
-}
 }
 
 function Get-BillingData {
