@@ -74,8 +74,8 @@ function Invoke-ExecGetAzureBillingCharges {
 
     try{
         $billingContext = Get-AzTableContext -connectionStr $secrets.AzBillingConnStr
-        $atMappingContext = Get-CIPPTable -tablename AutotaskAzureMapping
-        $atUnmappedContext = Get-CIPPTable -tablename AutotaskAzureUnmappedCharges
+        $atMappingContext = Get-CIPPTable -tablename AzureBillingMapping
+        $atUnmappedContext = Get-CIPPTable -tablename AzureBillingUnmappedCharges
         $atMappingRows = Get-CIPPAzDataTableEntity @atMappingContext
 
         if($atMappingRows.count -eq 0){

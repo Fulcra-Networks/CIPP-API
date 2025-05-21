@@ -27,7 +27,7 @@ function Invoke-ExecGetAzureUnmappedCharges {
 
         $SCRIPT:baseURI = $CfgExtensionTbl.AzureBilling.baseURI
 
-        $atUnmappedContext = Get-CIPPTable -tablename AutotaskAzureUnmappedCharges
+        $atUnmappedContext = Get-CIPPTable -tablename AzureBillingUnmappedCharges
         $unmappedFilter = "PartitionKey eq '$($monthFilter.ToString("MM-dd-yyyy"))'"
         $unmappedCharges = Get-CIPPAzDataTableEntity @atUnmappedContext -filter $unmappedFilter
 

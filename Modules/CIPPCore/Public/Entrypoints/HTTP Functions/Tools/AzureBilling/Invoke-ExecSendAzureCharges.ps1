@@ -31,7 +31,7 @@ function Invoke-ExecSendAzureCharges {
 
 
     $billingContext = Get-AzTableContext -connectionStr $AzBillingConnStr
-    $atMappingContext = Get-CIPPTable -tablename AutotaskAzureMapping
+    $atMappingContext = Get-CIPPTable -tablename AzureBillingMapping
     $atMappingRows = Get-CIPPAzDataTableEntity @atMappingContext
 
     $existingData = Get-BillingData -table $billingContext -date $billingDate
