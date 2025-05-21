@@ -30,7 +30,7 @@ function Invoke-ExecSendAzureCharges {
     }
 
 
-    $billingContext = Get-AzTableContext -connectionStr $AzBillingConnStr
+    $billingContext = Get-CIPPTable -tablename AzureBillingRawCharges #Get-AzTableContext -connectionStr $AzBillingConnStr
     $atMappingContext = Get-CIPPTable -tablename AzureBillingMapping
     $atMappingRows = Get-CIPPAzDataTableEntity @atMappingContext
 

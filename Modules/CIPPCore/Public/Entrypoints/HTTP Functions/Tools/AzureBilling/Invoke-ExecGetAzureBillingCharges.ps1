@@ -34,9 +34,8 @@ function Invoke-ExecGetAzureBillingCharges {
         $secrets = GetSecrets
     }
     catch {
-        Write-Host "$('*'*60)Error getting secrets"
-        Write-LogMessage -sev Error -API 'Azure Billing' -message 'Attempted to run Azure billing with no storage mapping'
-        $body= @("Error could not get secrets.")
+        Write-LogMessage -sev Error -API "Azure Billing' -message 'Error retrieving secrets. $($_.Exception.Message)"
+        $body= @("Error: could not get secrets.")
         Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
             StatusCode = [HttpStatusCode]::BadRequest
             Body       = $body
@@ -44,15 +43,6 @@ function Invoke-ExecGetAzureBillingCharges {
         return
     }
 
-    if([string]::IsNullOrEmpty($secrets.AzBillingConnStr)){
-        Write-LogMessage -sev Error -API 'Azure Billing' -message 'Attempted to run Azure billing with no storage mapping'
-        $body= @("Error could not connect to storage.")
-        Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
-            StatusCode = [HttpStatusCode]::BadRequest
-            Body       = $body
-        })
-        return
-    }
     if([string]::IsNullOrEmpty($secrets.ArrowSecret)){
         Write-LogMessage -sev Error -API 'Azure Billing' -message 'Attempted to run Azure billing with no Arrow Secret'
         $body= @("Error could not connect to Arrow.")
@@ -73,7 +63,7 @@ function Invoke-ExecGetAzureBillingCharges {
     }
 
     try{
-        $billingContext = Get-AzTableContext -connectionStr $secrets.AzBillingConnStr
+        $billingContext = Get-CIPPTable -tablename AzureBillingRawCharges
         $atMappingContext = Get-CIPPTable -tablename AzureBillingMapping
         $atUnmappedContext = Get-CIPPTable -tablename AzureBillingUnmappedCharges
         $atMappingRows = Get-CIPPAzDataTableEntity @atMappingContext
@@ -143,18 +133,6 @@ function Invoke-ExecGetAzureBillingCharges {
         StatusCode = [HttpStatusCode]::OK
         Body       = $body
     })
-}
-
-<# This is able to use custom AzStora#>
-function Get-AzTableContext
-{
-    param($connectionStr)
-    $billingContext = New-AzDataTableContext -ConnectionString $connectionStr -TableName "ArrowAzMonthlySplitRG"
-    New-AzDataTable -Context $billingContext | Out-Null
-
-    @{
-        Context = $billingContext
-    }
 }
 
 function Get-MappedUnmappedCharges {
@@ -417,17 +395,10 @@ function GetAzureConsumptionMonthSplit {
 
 function GetSecrets {
     $secrets = @{
-        AzBillingConnStr=""
         ArrowSecret=""
         ArrowAuthKey=""
     }
 
-    if (!$ENV:AzBillingConnStr) {
-        $null = Connect-AzAccount -Identity
-        $secrets.AzBillingConnStr = (Get-AzKeyVaultSecret -VaultName $ENV:WEBSITE_DEPLOYMENT_ID -Name 'AzStorageConnStr' -AsPlainText)
-    } else {
-        $secrets.AzBillingConnStr = $ENV:AzBillingConnStr
-    }
     if (!$ENV:ArrowSecret) {
         $null = Connect-AzAccount -Identity
         $secrets.ArrowSecret = (Get-AzKeyVaultSecret -VaultName $ENV:WEBSITE_DEPLOYMENT_ID -Name 'ArrowSecret' -AsPlainText)
