@@ -48,8 +48,9 @@ function Get-ATMinuteMinderCheckIn {
 
     $CIPPAlert = @{
         Type        = 'email'
-        Title       = $Title
+        Title       = "CIPP Minute Minder"
         HTMLContent = "$($everyonesHours|ConvertTo-JSON -depth 10)"
+        APIName     = 'MinuteMinder'
     }
 
     Send-CIPPAlert @CIPPAlert
