@@ -36,6 +36,10 @@ function Get-ATMinuteMinderCheckIn {
 
     Write-Host "$('*'*60)`n$people`n$('*'*60)"
 
+    $CtxExtensionCfg = Get-CIPPTable -TableName Extensionsconfig
+    $CfgExtensionTbl = (Get-CIPPAzDataTableEntity @CtxExtensionCfg).config | ConvertFrom-Json -Depth 10
+    Get-AutotaskToken -configuration $CfgExtensionTbl.Autotask
+
     $everyonesHours = @()
 
     foreach($person in $people){
@@ -49,10 +53,8 @@ function Get-ATMinuteMinderCheckIn {
     $CIPPAlert = @{
         Type        = 'email'
         Title       = "CIPP Minute Minder"
-        HTMLContent = "$($everyonesHours|ConvertTo-JSON -depth 10)"
-        APIName     = 'MinuteMinder'
+        HTMLContent = "$($everyonesHours|ConvertTo-Json -Depth 10)"
     }
-
     Send-CIPPAlert @CIPPAlert
 }
 
