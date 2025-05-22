@@ -56,7 +56,8 @@ function Get-ATMinuteMinderCheckIn {
     Write-LogMessage -sev info -API 'MinuteMinder' -Message "Got hours for $($people.Count) people, a total number of $($everyonesHours.length) entries."
 
     try{
-        $htmlbody = "<p>Please see the below for recent timesheet data:<br/><table>"
+        $htmlbody = "<p>The following days were found in the previous 14 days that may need time added.<br/>"
+        $htmlbody += "Please see the below for recent timesheet data:<br/><table>"
         $htmlbody += "<tr><th>Name</th><th>Date</th><th>Total Hours</th><th>Billable Hours</th><th>Regular Hours</th></tr>"
         foreach($hours in $everyonesHours){
             $htmlbody += "<tr><td>$($hours.Name)</td>"
@@ -65,7 +66,7 @@ function Get-ATMinuteMinderCheckIn {
             $htmlbody += "<td>$($hours.billableHours)</td>"
             $htmlbody += "<td>$($hours.regularHours)</td></tr>"
         }
-        $htmlbody += "</table></p>"
+        $htmlbody += "</table><br/><br/>This check reviews the previous 14 days for days where total combined time entries are less than 7 hours.</p>"
 
         $CIPPAlert = @{
             Type                    = 'email'
@@ -93,15 +94,11 @@ function Get-HoursData {
 
     [HoursData[]]$hoursList = @()
 
-    while($true -or $hoursList.length -lt 10){
+    $cutoffDate = [DateTime]::Now.AddDays(-14)
+    while($true -or $queryDate.Date -le $cutoffDate.Date){
         $dayHours = Get-HoursForDay -date $queryDate -resourceID $resourceID
         $dayHours.SetName("$($person.firstname) $($person.Lastname)")
         $dayHours.SetEmail("$($person.email)")
-        $hoursList += $dayHours
-
-        if($dayHours.TotalHours() -ge 8){
-            break
-        }
 
         if($queryDate.DayOfWeek -eq 'Monday'){
             $queryDate = $queryDate.AddDays(-3)
@@ -109,6 +106,12 @@ function Get-HoursData {
         else {
             $queryDate = $queryDate.AddDays(-1)
         }
+
+        if($dayHours.TotalHours() -ge 7){
+            continue
+        }
+        $hoursList += $dayHours
+
     }
 
     return $hoursList
