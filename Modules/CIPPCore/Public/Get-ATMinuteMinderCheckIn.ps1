@@ -56,15 +56,16 @@ function Get-ATMinuteMinderCheckIn {
     Write-LogMessage -sev info -API 'MinuteMinder' -Message "Got hours for $($people.Count) people, a total number of $($everyonesHours.length) entries."
 
     try{
-        $htmlbody = "<p>The following days were found in the previous 14 days that may need time added.<br/>"
+        $htmlbody = "<style>table, th, td {border: 1px solid black;border-collapse: collapse;}</style>"
+        $htmlbody += "<p>The following days were found in the previous 14 days that may need time added.<br/>"
         $htmlbody += "Please see the below for recent timesheet data:<br/><table>"
-        $htmlbody += "<tr><th>Name</th><th>Date</th><th>Total Hours</th><th>Billable Hours</th><th>Regular Hours</th></tr>"
+        $htmlbody += "<tr><th>Name</th><th>Date</th><thBillable Hours></th><th>Regular Hours</th><th>Total Hours</th></tr>"
         foreach($hours in $everyonesHours){
             $htmlbody += "<tr><td>$($hours.Name)</td>"
             $htmlbody += "<td>$($hours.hoursDate.ToString("yyyy-MM-dd"))</td>"
-            $htmlbody += "<td>$($hours.TotalHours())</td>"
             $htmlbody += "<td>$($hours.billableHours)</td>"
-            $htmlbody += "<td>$($hours.regularHours)</td></tr>"
+            $htmlbody += "<td>$($hours.regularHours)</td>"
+            $htmlbody += "<td>$($hours.TotalHours())</td></tr>"
         }
         $htmlbody += "</table><br/><br/>This check reviews the previous 14 days for days where total combined time entries are less than 7 hours.</p>"
 
