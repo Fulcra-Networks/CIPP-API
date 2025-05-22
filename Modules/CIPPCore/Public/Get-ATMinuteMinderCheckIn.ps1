@@ -52,26 +52,31 @@ function Get-ATMinuteMinderCheckIn {
         $everyonesHours += $hoursData
     }
 
-    Write-LogMessage -sev info -API 'MinuteMinder' -Message "Got hours for $($people.Count), a total number of $($everyonesHours.length) entries."
+    Write-LogMessage -sev info -API 'MinuteMinder' -Message "Got hours for $($people.Count) people, a total number of $($everyonesHours.length) entries."
 
-    $htmlbody = "<p>Please see the below for recent timesheet data:<br/><table>"
-    $htmlbody += "<tr><th>Name</th><th>Date</th><th>Total Hours</th><th>Billable Hours</th><th>Regular Hours</th></tr>"
-    foreach($hours in $everyonesHours){
-        $htmlbody += "<tr><td>$($hours.Name)</td>"
-        $htmlbody += "<td>$($hours.hoursDate.ToString("yyyy-MM-dd"))</td>"
-        $htmlbody += "<td>$($hours.TotalHours())</td>"
-        $htmlbody += "<td>$($hours.billableHours)</td>"
-        $htmlbody += "<td>$($hours.regularHours)</td></tr>"
-    }
-    $htmlbody += "</table></p>"
+    try{
+        $htmlbody = "<p>Please see the below for recent timesheet data:<br/><table>"
+        $htmlbody += "<tr><th>Name</th><th>Date</th><th>Total Hours</th><th>Billable Hours</th><th>Regular Hours</th></tr>"
+        foreach($hours in $everyonesHours){
+            $htmlbody += "<tr><td>$($hours.Name)</td>"
+            $htmlbody += "<td>$($hours.hoursDate.ToString("yyyy-MM-dd"))</td>"
+            $htmlbody += "<td>$($hours.TotalHours())</td>"
+            $htmlbody += "<td>$($hours.billableHours)</td>"
+            $htmlbody += "<td>$($hours.regularHours)</td></tr>"
+        }
+        $htmlbody += "</table></p>"
 
-    $CIPPAlert = @{
-        Type                    = 'email'
-        Title                   = "CIPP Minute Minder"
-        HTMLContent             = $htmlBody
-        $AdditionalRecipients   = $addtnlRecip
+        $CIPPAlert = @{
+            Type                    = 'email'
+            Title                   = "CIPP Minute Minder"
+            HTMLContent             = $htmlBody
+            $AdditionalRecipients   = $addtnlRecip
+        }
+        Send-CIPPAlert @CIPPAlert
     }
-    Send-CIPPAlert @CIPPAlert
+    catch {
+        Write-LogMessage -sev Error -API "MinuteMinder" -Message "Error sending MinuteMinder email: $($_.Exception.Message)"
+    }
 }
 
 function Get-HoursData {
