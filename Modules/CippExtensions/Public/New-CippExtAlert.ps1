@@ -17,9 +17,13 @@ function New-CippExtAlert {
                     $MappingFile = Get-ExtensionMapping -Extension 'Autotask'
                     $MappedId = ($MappingFile | Where-Object { $_.RowKey -eq $TenantId }).IntegrationId
 
-                    if (!$MappedId) { $MappedId = 1 } #This auto assigns to the AT base company.
+                    if (!$MappedId) { $MappedId = 0 } #This auto assigns to the AT base company.
 
-                    $AlertText = $(if($Alert.AlertJSON){$Alert.AlertJSON} else{$Alert.AlertText})
+                    if($Alert.AlertJSON){
+                        $AlertText = $Alert.AlertJSON
+                    } else {
+                        $AlertText = $Alert.AlertText
+                    }
 
                     Write-LogMessage -API 'Webhook Alerts' -tenant $TenantFilter -message "Create AT Ticket for map: $MappedId, Tenant: $TenantId - Title: $($Alert.AlertTitle) - Text: $($AlertText)" -sev info
 

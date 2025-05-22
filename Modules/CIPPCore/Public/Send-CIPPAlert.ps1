@@ -10,6 +10,7 @@ function Send-CIPPAlert {
         $APIName = 'Send Alert',
         $Headers,
         $TableName,
+        $AdditionalRecipients,
         $RowKey = [string][guid]::NewGuid()
     )
     Write-Information 'Shipping Alert'
@@ -21,6 +22,7 @@ function Send-CIPPAlert {
         try {
             if ($Config.email -like '*@*') {
                 $Recipients = $Config.email.split($(if ($Config.email -like '*,*') { ',' } else { ';' })).trim() | ForEach-Object { if ($_ -like '*@*') { [pscustomobject]@{EmailAddress = @{Address = $_ } } } }
+                if($AdditionalRecipients.count -gt 0) { $AdditionalRecipients | ForEach-Object { $Recipients += [pscustomobject]@{EmailAddress = @{Address = $_ } } }}
                 $PowerShellBody = [PSCustomObject]@{
                     message         = @{
                         subject      = $Title

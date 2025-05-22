@@ -30,9 +30,13 @@ class HoursData {
 
 function Get-ATMinuteMinderCheckIn {
     [CmdletBinding()]
-    param([string]$peopleJSON)
+    param([string]$peopleCSV,[string]$additionalRecipCSV)
 
-    $people = $peopleJSON.Split(' ')
+    $people = $peopleCSV.Split(',')
+
+    $addtnlRecip = @()
+    if(-not [string]::IsNullOrEmpty($additionalRecipCSV))
+    { $addtnlRecip = $additionalRecipCSV.Split(',') }
 
     Write-Host "$('*'*60)`n$people`n$('*'*60)"
 
@@ -48,12 +52,24 @@ function Get-ATMinuteMinderCheckIn {
         $everyonesHours += $hoursData
     }
 
-    Write-LogMessage -sev info -API 'MinuteMinder' -Message "$($everyonesHours|ConvertTo-JSON -depth 10)"
+    Write-LogMessage -sev info -API 'MinuteMinder' -Message "Got hours for $($people.Count), a total number of $($everyonesHours.length) entries."
+
+    $htmlbody = "<p>Please see the below for recent timesheet data:<br/><table>"
+    $htmlbody += "<tr><th>Name</th><th>Date</th><th>Total Hours</th><th>Billable Hours</th><th>Regular Hours</th></tr>"
+    foreach($hours in $everyonesHours){
+        $htmlbody += "<tr><td>$($hours.Name)</td>"
+        $htmlbody += "<td>$($hours.hoursDate.ToString("yyyy-MM-dd"))</td>"
+        $htmlbody += "<td>$($hours.TotalHours())</td>"
+        $htmlbody += "<td>$($hours.billableHours)</td>"
+        $htmlbody += "<td>$($hours.regularHours)</td></tr>"
+    }
+    $htmlbody += "</table></p>"
 
     $CIPPAlert = @{
-        Type        = 'email'
-        Title       = "CIPP Minute Minder"
-        HTMLContent = "$($everyonesHours|ConvertTo-Json -Depth 10)"
+        Type                    = 'email'
+        Title                   = "CIPP Minute Minder"
+        HTMLContent             = $htmlBody
+        $AdditionalRecipients   = $addtnlRecip
     }
     Send-CIPPAlert @CIPPAlert
 }
