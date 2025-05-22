@@ -32,12 +32,12 @@ function Get-ATMinuteMinderCheckIn {
     [CmdletBinding()]
     param([string]$peopleCSV,[string]$additionalRecipCSV)
 
-    $people = $peopleCSV.Split(',')
+    $people = $peopleCSV.Split(',').Trim()
 
     $addtnlRecip = @()
     if(-not [string]::IsNullOrEmpty($additionalRecipCSV))
     {
-        $addtnlRecip = $additionalRecipCSV.Split(',')
+        $addtnlRecip = $additionalRecipCSV.Split(',').Trim()
         Write-LogMessage -sev Info -API "MinuteMinder" -message "Additional email recipients: $($additionalRecipCSV), $($addtnlRecip)"
     }
 
