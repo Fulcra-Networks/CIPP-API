@@ -59,7 +59,7 @@ function Get-ATMinuteMinderCheckIn {
         $htmlbody = "<style>table, th, td {border: 1px solid black;border-collapse: collapse;}</style>"
         $htmlbody += "<p>The following days were found in the previous 14 days that may need time added.<br/>"
         $htmlbody += "Please see the below for recent timesheet data:<br/><table>"
-        $htmlbody += "<tr><th>Name</th><th>Date</th><thBillable Hours></th><th>Regular Hours</th><th>Total Hours</th></tr>"
+        $htmlbody += "<tr><th>Name</th><th>Date</th><th>Billable Hours</th><th>Regular Hours</th><th>Total Hours</th></tr>"
         foreach($hours in $everyonesHours){
             $htmlbody += "<tr><td>$($hours.Name)</td>"
             $htmlbody += "<td>$($hours.hoursDate.ToString("yyyy-MM-dd"))</td>"
