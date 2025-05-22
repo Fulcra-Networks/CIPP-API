@@ -36,9 +36,11 @@ function Get-ATMinuteMinderCheckIn {
 
     $addtnlRecip = @()
     if(-not [string]::IsNullOrEmpty($additionalRecipCSV))
-    { $addtnlRecip = $additionalRecipCSV.Split(',') }
+    {
+        $addtnlRecip = $additionalRecipCSV.Split(',')
+        Write-LogMessage -sev Info -API "MinuteMinder" -message "Additional email recipients: $($additionalRecipCSV), $($addtnlRecip)"
+    }
 
-    Write-Host "$('*'*60)`n$people`n$('*'*60)"
 
     $CtxExtensionCfg = Get-CIPPTable -TableName Extensionsconfig
     $CfgExtensionTbl = (Get-CIPPAzDataTableEntity @CtxExtensionCfg).config | ConvertFrom-Json -Depth 10
@@ -48,7 +50,6 @@ function Get-ATMinuteMinderCheckIn {
 
     foreach($person in $people){
         $hoursData = Get-HoursData $person
-        Write-Host "Got $($hoursData.length) hours entries"
         $everyonesHours += $hoursData
     }
 
@@ -70,7 +71,7 @@ function Get-ATMinuteMinderCheckIn {
             Type                    = 'email'
             Title                   = "CIPP Minute Minder"
             HTMLContent             = $htmlBody
-            $AdditionalRecipients   = $addtnlRecip
+            $AdditionalRecipients   = @($addtnlRecip)
         }
         Send-CIPPAlert @CIPPAlert
     }
