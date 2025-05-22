@@ -19,7 +19,7 @@ function New-AutotaskTicket {
         }
 
 
-        Write-LogMessage -api 'Autotask' -tenant 'None' -message "Creating ticket with parameters: $atCompanyId,$title,$($description.substring(0,30)),$estHr,$issueType,$subIssueType,$ticketType,$priority" -Sev Info
+        Write-LogMessage -api 'Autotask' -tenant 'None' -message "Creating ticket with parameters: $atCompanyId,$title,$estHr,$issueType,$subIssueType,$ticketType,$priority" -Sev Info
 
         $ticket = New-AutotaskBody -Resource Tickets -NoContent
         $ticket.Id                      = "0"                   #Always 0 for a new ticket
