@@ -95,7 +95,7 @@ function Get-HoursData {
     [HoursData[]]$hoursList = @()
 
     $cutoffDate = [DateTime]::Now.AddDays(-14)
-    while($true -or $queryDate.Date -le $cutoffDate.Date){
+    while($queryDate.Date -ge $cutoffDate.Date){
         $dayHours = Get-HoursForDay -date $queryDate -resourceID $resourceID
         $dayHours.SetName("$($person.firstname) $($person.Lastname)")
         $dayHours.SetEmail("$($person.email)")
