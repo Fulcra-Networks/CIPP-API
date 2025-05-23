@@ -15,9 +15,12 @@ function New-AutotaskTicket {
         Get-AutotaskToken -configuration $Configuration.Autotask | Out-Null
 
         if($description -match "</table>"){
-            $description = Convert-HtmlTableToPlainText $description
+            $description = $description `
+                -replace '<!--\[if[\s\S]*?<!\[endif\]-->', '' `
+                -replace '<style[\s\S]*?<\/style>', '' `
+                -replace '<[^>]+>', ''
+            $description = $decription.trim()
         }
-
 
         Write-LogMessage -api 'Autotask' -tenant 'None' -message "Creating ticket with parameters: $atCompanyId,$title,$estHr,$issueType,$subIssueType,$ticketType,$priority" -Sev Info
 
@@ -45,54 +48,6 @@ function New-AutotaskTicket {
     catch {
         Write-LogMessage -API 'Autotask' -tenant 'none' -message "Error creating ticket. $($_.Exception.Message)" -Sev Error
     }
-}
-
-function Convert-HtmlTableToPlainText {
-    param($htmltbl)
-    # Parse the HTML content
-    $HTML = New-Object -Com "HTMLFile"
-
-    try {
-        # This works in PowerShell with Office installed
-        $html.IHTMLDocument2_write($htmltbl)
-    }
-    catch {
-        # This works when Office is not installed
-        $src = [System.Text.Encoding]::Unicode.GetBytes($htmltbl)
-        $html.write($src)
-    }
-
-    $tables = @($html.getElementsByTagName("TABLE"))
-
-    $table = $tables[0]
-    $titles = @()
-    $rows = @($table.Rows)
-    $objArray = @()
-
-    foreach ($row in $rows) {
-        $cells = @($row.Cells)
-
-        if ($cells[0].tagName -eq "TH") {
-            $titles = @($cells | ForEach-Object { ("" + $_.InnerText).Trim() })
-            continue
-        }
-
-        if (-not $titles) {
-            $titles = @(1..($cells.Count + 2) | ForEach-Object { "P$_" })
-        }
-
-        $resultObject = [Ordered] @{ }
-        for ($counter = 0; $counter -lt $cells.Count; $counter++) {
-            $title = $titles[$counter]
-            if (-not $title) { continue }
-            $resultObject[$title] = ("" + $cells[$counter].InnerText).Trim()
-        }
-
-        $objArray += [PSCustomObject] $resultObject
-    }
-
-
-    return ($objArray|ConvertTo-Csv -NoTypeInformation)
 }
 
 <# TICKET STATUS:
