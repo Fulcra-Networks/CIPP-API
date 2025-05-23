@@ -19,7 +19,7 @@ function New-AutotaskTicket {
                 -replace '<!--\[if[\s\S]*?<!\[endif\]-->', '' `
                 -replace '<style[\s\S]*?<\/style>', '' `
                 -replace '<[^>]+>', ''
-            $description = $decription.trim()
+            $description = $description.trim()
         }
 
         Write-LogMessage -api 'Autotask' -tenant 'None' -message "Creating ticket with parameters: $atCompanyId,$title,$estHr,$issueType,$subIssueType,$ticketType,$priority" -Sev Info
