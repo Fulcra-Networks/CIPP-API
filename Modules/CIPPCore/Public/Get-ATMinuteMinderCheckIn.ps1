@@ -32,6 +32,11 @@ function Get-ATMinuteMinderCheckIn {
     [CmdletBinding()]
     param([string]$peopleCSV,[string]$additionalRecipCSV)
 
+    if(@("Saturday", "Sunday").Contains([DateTime]::Now.DayOfWeek.ToString())) {
+        Write-LogMessage -sev Info -API 'MinuteMinder' -Message 'Minute Minder does not run on weekends.'
+        return
+    }
+
     $people = $peopleCSV.Split(',').Trim()
 
     $addtnlRecip = @()
