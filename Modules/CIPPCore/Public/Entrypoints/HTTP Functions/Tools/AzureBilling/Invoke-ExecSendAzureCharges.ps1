@@ -83,10 +83,6 @@ function Invoke-ExecSendAzureCharges {
         }
     }
 
-    # Write-Host "$('*'*60)"
-    # Write-Host "$($charges|ConvertTo-Json -Depth 10)"
-    # Write-Host "$('*'*60)"
-
     Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
             StatusCode = [HttpStatusCode]::OK
             Body       = "Sent $($results.count) of $($charges.count) charges."

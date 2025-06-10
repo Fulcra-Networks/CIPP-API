@@ -19,7 +19,8 @@ function Invoke-ExecGetAzureBillingCharges {
     $CtxExtensionCfg = Get-CIPPTable -TableName Extensionsconfig
     $CfgExtensionTbl = (Get-CIPPAzDataTableEntity @CtxExtensionCfg).config | ConvertFrom-Json -Depth 10
 
-    $SCRIPT:baseURI = $CfgExtensionTbl.AzureBilling.baseURI
+    $SCRIPT:baseURI = $CfgExtensionTbl.AzureBilling.APIHost
+    $SCRIPT:authKey = $CfgExtensionTbl.AzureBilling.APIAuthKey
 
     if(-not $CfgExtensionTbl.AzureBilling){
         $body = @("Extension is not configured")
@@ -31,7 +32,7 @@ function Invoke-ExecGetAzureBillingCharges {
     }
 
     try{
-        $secrets = GetSecrets
+        $secret = GetSecret
     }
     catch {
         Write-LogMessage -sev Error -API "Azure Billing' -message 'Error retrieving secrets. $($_.Exception.Message)"
@@ -43,7 +44,7 @@ function Invoke-ExecGetAzureBillingCharges {
         return
     }
 
-    if([string]::IsNullOrEmpty($secrets.ArrowSecret)){
+    if([string]::IsNullOrEmpty($secret)){
         Write-LogMessage -sev Error -API 'Azure Billing' -message 'Attempted to run Azure billing with no Arrow Secret'
         $body= @("Error could not connect to Arrow.")
         Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
@@ -52,7 +53,7 @@ function Invoke-ExecGetAzureBillingCharges {
         })
         return
     }
-    if([string]::IsNullOrEmpty($secrets.ArrowAuthKey)){
+    elseif([string]::IsNullOrEmpty($SCRIPT:authKey)){
         Write-LogMessage -sev Error -API 'Azure Billing' -message 'Attempted to run Azure billing with no Arrow Auth Key'
         $body= @("Error could not connect to Arrow.")
         Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
@@ -93,7 +94,7 @@ function Invoke-ExecGetAzureBillingCharges {
 
         $monthFilter = ([DateTime]::ParseExact($request.Query.date,'yyyyMMdd',$null).ToString('yyyy-MM'))
 
-        $hdrAuth = @{apikey = $secrets.ArrowAuthKey; secret = $secrets.ArrowSecret}
+        $hdrAuth = @{apikey = $SCRIPT:authKey; secret = $secret}
 
         $customers = GetArrowCustomers -hdrAuth $hdrAuth
 
@@ -393,26 +394,18 @@ function GetAzureConsumptionMonthSplit {
     }
 }
 
-function GetSecrets {
-    $secrets = @{
-        ArrowSecret=""
-        ArrowAuthKey=""
-    }
+function GetSecret {
+    $secret = ''
 
     if (!$ENV:ArrowSecret) {
         $null = Connect-AzAccount -Identity
-        $secrets.ArrowSecret = (Get-AzKeyVaultSecret -VaultName $ENV:WEBSITE_DEPLOYMENT_ID -Name 'ArrowSecret' -AsPlainText)
+        $secret = (Get-AzKeyVaultSecret -VaultName $ENV:WEBSITE_DEPLOYMENT_ID -Name 'AzureBilling' -AsPlainText)
     } else {
-        $secrets.ArrowSecret = $ENV:ArrowSecret
-    }
-    if (!$ENV:ArrowAuthKey) {
-        $null = Connect-AzAccount -Identity
-        $secrets.ArrowAuthKey = (Get-AzKeyVaultSecret -VaultName $ENV:WEBSITE_DEPLOYMENT_ID -Name 'ArrowAuthKey' -AsPlainText)
-    } else {
-        $secrets.ArrowAuthKey = $ENV:ArrowAuthKey
+        $secret = $ENV:ArrowSecret
     }
 
-    return $secrets
+
+    return $secret
 }
 
 class consumptionMonthLine {

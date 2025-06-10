@@ -1,13 +1,10 @@
 using namespace System.Net
 
-[string]$baseURI = ''
 
 function Invoke-ExecGetAzureUnmappedCharges {
     [CmdletBinding()]
     param($Request, $TriggerMetadata)
 
-
-    Write-Host "$('*'*60) Using Date: $($Request.Query.date) for search"
     if ([String]::IsNullOrEmpty($request.Query.date)) {
         $body = @("No date set")
         Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
@@ -21,11 +18,6 @@ function Invoke-ExecGetAzureUnmappedCharges {
         #Unmapped charges are always the 28th of the month (04-28-2025)
         $monthFilter = [DateTime]::ParseExact($request.Query.date,'yyyyMMdd',$null)
         $monthFilter = [DateTime]::New($monthFilter.Year,$monthFilter.Month, 28)
-
-        $CtxExtensionCfg = Get-CIPPTable -TableName Extensionsconfig
-        $CfgExtensionTbl = (Get-CIPPAzDataTableEntity @CtxExtensionCfg).config | ConvertFrom-Json -Depth 10
-
-        $SCRIPT:baseURI = $CfgExtensionTbl.AzureBilling.baseURI
 
         $atUnmappedContext = Get-CIPPTable -tablename AzureBillingUnmappedCharges
         $unmappedFilter = "PartitionKey eq '$($monthFilter.ToString("MM-dd-yyyy"))'"
