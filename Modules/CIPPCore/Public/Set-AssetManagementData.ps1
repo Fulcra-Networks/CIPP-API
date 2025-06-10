@@ -1,10 +1,12 @@
 using namespace System.Net
 
-<# Moved to a background job to improve UI performance. Trigger via the CIPP/Tools/Scheduler interface.
-    Needs to return:
-        - Matched
-        - UnMatched
-        - DateTime of last run
+<#
+    - Fetch+Store Devices from PSA
+    - Fetch+Store Devices from RMM
+    Provides tables which the UI will quickly be able to query.
+    No matching will be performed on this end.
+
+    Maybe query for PSA duplicate SN where RMM device exists?
 #>
 
 Function Set-AssetManagementData {
@@ -23,7 +25,7 @@ Function Set-AssetManagementData {
 
     $tenantId = $Tenants | Where-Object { $_.defaultDomainName -eq $TenantFilter } | Select-Object -ExpandProperty RowKey
 
-    $Table = Get-CIPPTable -TableName Extensionsconfig
+    $Table = Get-CIPPTable -TableName ExtensionsConfig
     $Configuration = (Get-CIPPAzDataTableEntity @Table).config | ConvertFrom-Json -Depth 10
 
     $cfgPSA = Get-PSAConfig $Configuration
@@ -125,7 +127,7 @@ Function Set-AssetManagementData {
 Function Get-PSAConfig {
     param($Configuration)
 
-    if($PSAconfig = $Configuration.Autotask){
+    if($PSAConfig = $Configuration.Autotask){
         return [PSCustomObject]@{
             Name = 'Autotask'
             Config = $PSAConfig

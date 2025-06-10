@@ -5,15 +5,15 @@ function Get-AutotaskDevices {
     $ExtensionMappings = Get-ExtensionMapping -Extension 'Autotask'
 
     try{
-        $Table = Get-CIPPTable -TableName Extensionsconfig
+        $Table = Get-CIPPTable -TableName ExtensionsConfig
         $Configuration = ((Get-CIPPAzDataTableEntity @Table).config | ConvertFrom-Json -ea stop).Autotask
 
-        $AtCustID = $ExtensionMappings | Where-Object { $_.rowKey -eq $tenantId } | Select-Object -ExpandProperty IntegrationId
+        $ATCustomerID = $ExtensionMappings | Where-Object { $_.rowKey -eq $tenantId } | Select-Object -ExpandProperty IntegrationId
 
         Get-AutotaskToken -configuration $Configuration | Out-Null
 
 
-        $customerContracts = Get-AutotaskAPIResource -resource Contracts -SimpleSearch "companyid eq $($AtCustID)"
+        $customerContracts = Get-AutotaskAPIResource -resource Contracts -SimpleSearch "companyid eq $($ATCustomerID)"
 
 
         #Retrieve all Active, Workstation type devices for the tenant
@@ -22,7 +22,7 @@ function Get-AutotaskDevices {
                 [PSCustomObject]@{op="eq";field="productID";value="29683512"}
                 [PSCustomObject]@{op="eq";field="configurationItemType";value="1"},
                 [PSCustomObject]@{op="eq";field="isActive";value="true"},
-                [PSCustomObject]@{op="eq";field="companyID";value="$AtCustID"}
+                [PSCustomObject]@{op="eq";field="companyID";value="$ATCustomerID"}
             )
         }
 
@@ -39,7 +39,7 @@ function Get-AutotaskDevices {
 
         $confContract = ""
         if(![String]::IsNullOrEmpty($conf.contractID)){
-            $confContract = $customerContracts | ? { $_.id -eq $conf.contractID}
+            $confContract = $customerContracts | Where-Object { $_.id -eq $conf.contractID}
         }
 
         $results += [PSCustomObject]@{
