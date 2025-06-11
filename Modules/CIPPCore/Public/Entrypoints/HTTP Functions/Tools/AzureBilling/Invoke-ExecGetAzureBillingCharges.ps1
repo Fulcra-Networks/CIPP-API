@@ -45,7 +45,6 @@ function Invoke-ExecGetAzureBillingCharges {
         $billingContext = Get-CIPPTable -tablename AzureBillingRawCharges
         $atMappingContext = Get-CIPPTable -tablename AzureBillingMapping
         $atUnmappedContext = Get-CIPPTable -tablename AzureBillingUnmappedCharges
-        $atMappingRows = Get-CIPPAzDataTableEntity @atMappingContext
 
         if($atMappingRows.count -eq 0){
             Write-LogMessage -sev Info -API 'Azure Billing' -message "Got no rows from AutotaskAzureMapping"
@@ -57,17 +56,18 @@ function Invoke-ExecGetAzureBillingCharges {
 
         $body = @()
 
-        $existingData = Get-ExistingBillingData -table $billingContext -date $request.Query.date
-
-        if($existingData.count -gt 0 -and [bool]::Parse($request.Query.rerunJob) -eq $false){
-            Write-LogMessage -sev Info -API "Azure Billing" -message "Existing records found and rerun not requested."
-            $mappedUnmapped = Get-MappedUnmappedCharges -azMonthSplit $existingData -body $body -atMapping $atMappingRows
-            $body = $mappedUnmapped.mapped
-            Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
-                StatusCode = [HttpStatusCode]::OK
-                Body       = $body
-            })
-            return
+        if([bool]::Parse($request.Query.rerunJob) -eq $false){
+            $existingData = Get-ExistingBillingData -table $billingContext -date $request.Query.date
+            if($existingData.count -gt 0){
+                Write-LogMessage -sev Info -API "Azure Billing" -message "Existing records found and rerun not requested."
+                $mappedUnmapped = Get-MappedUnmappedCharges -azMonthSplit $existingData -body $body -atMapping $atMappingRows
+                $body = $mappedUnmapped.mapped
+                Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
+                    StatusCode = [HttpStatusCode]::OK
+                    Body       = $body
+                })
+                return
+            }
         }
 
         $monthFilter = ([DateTime]::ParseExact($request.Query.date,'yyyyMMdd',$null).ToString('yyyy-MM'))
@@ -95,6 +95,7 @@ function Invoke-ExecGetAzureBillingCharges {
             }
         }
 
+        $atMappingRows = Get-CIPPAzDataTableEntity @atMappingContext
         $data = Get-ExistingBillingData -table $billingContext -date $request.Query.date
         $mappedUnmapped = Get-MappedUnmappedCharges -azMonthSplit $data -body $body -atMapping $atMappingRows
         $body = $mappedUnmapped.mapped
@@ -120,10 +121,7 @@ function Get-MappedUnmappedCharges {
 
     $atMappingHashTable = @{}
     $atMapping| ForEach-Object {
-        if([string]::IsNullOrEmpty($_.PartitionKey) -or [string]::IsNullOrEmpty($_.paxResourceGroupName)) {
-            continue
-        }
-        else {
+        if(-not [string]::IsNullOrEmpty($_.PartitionKey) -and -not [string]::IsNullOrEmpty($_.paxResourceGroupName)) {
             $join = ("$($_.PartitionKey.Trim()) - $($_.paxResourceGroupName.Trim())").ToUpper()
             $atMappingHashTable[$join] = $_
         }
@@ -193,7 +191,7 @@ function Write-ChargesToTable {
             }
 
             $AddObject = @{
-                PartitionKey= $line.month
+                PartitionKey    = $line.month
                 RowKey          = "$($line.licenseRef) - $($line.group)"
                 currency        = $line.currency
                 customer        = $line.customer
@@ -204,7 +202,6 @@ function Write-ChargesToTable {
                 totalList       = $line.totalList
                 totalReseller   = $line.totalReseller
             }
-
 
             if([bool]::Parse($rerun)){
                 Add-CIPPAzDataTableEntity @table -Entity $AddObject -Force

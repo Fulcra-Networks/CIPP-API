@@ -63,7 +63,7 @@ Function Invoke-ExecExtensionTest {
                 $Results = [pscustomobject]@{ "Results" = "Succesfully Connected to Autotask" }
             }
             "AzureBilling" {
-                $token = Get-AzureBillingToken -configuration $Configuration.AzureBilling
+                $token = Get-AzureBillingToken -configuration $Configuration
                 if ($token) {
                     $Results = [pscustomobject]@{'Results' = 'Successfully Connected to AzureBilling' }
                 } else {
