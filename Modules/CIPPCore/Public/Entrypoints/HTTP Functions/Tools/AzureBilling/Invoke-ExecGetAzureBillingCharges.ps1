@@ -19,9 +19,6 @@ function Invoke-ExecGetAzureBillingCharges {
     $CtxExtensionCfg = Get-CIPPTable -TableName Extensionsconfig
     $CfgExtensionTbl = (Get-CIPPAzDataTableEntity @CtxExtensionCfg).config | ConvertFrom-Json -Depth 10
 
-    $SCRIPT:baseURI = $CfgExtensionTbl.AzureBilling.APIHost
-    $SCRIPT:authKey = $CfgExtensionTbl.AzureBilling.APIAuthKey
-
     if(-not $CfgExtensionTbl.AzureBilling){
         $body = @("Extension is not configured")
         Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
@@ -31,36 +28,17 @@ function Invoke-ExecGetAzureBillingCharges {
         return  # Short-circuit the function
     }
 
-    try{
-        $secret = GetSecret
-    }
-    catch {
-        Write-LogMessage -sev Error -API "Azure Billing' -message 'Error retrieving secrets. $($_.Exception.Message)"
-        $body= @("Error: could not get secrets.")
-        Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
-            StatusCode = [HttpStatusCode]::BadRequest
-            Body       = $body
-        })
-        return
-    }
+    $SCRIPT:baseURI = $CfgExtensionTbl.AzureBilling.APIHost
 
-    if([string]::IsNullOrEmpty($secret)){
-        Write-LogMessage -sev Error -API 'Azure Billing' -message 'Attempted to run Azure billing with no Arrow Secret'
-        $body= @("Error could not connect to Arrow.")
+    $hdrAuth = Get-AzureBillingToken $CfgExtensionTbl
+
+    if(-not $hdrAuth){
+        $body = @("Could not get authentication data")
         Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
             StatusCode = [HttpStatusCode]::BadRequest
             Body       = $body
         })
-        return
-    }
-    elseif([string]::IsNullOrEmpty($SCRIPT:authKey)){
-        Write-LogMessage -sev Error -API 'Azure Billing' -message 'Attempted to run Azure billing with no Arrow Auth Key'
-        $body= @("Error could not connect to Arrow.")
-        Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
-            StatusCode = [HttpStatusCode]::BadRequest
-            Body       = $body
-        })
-        return
+        return  # Short-circuit the function
     }
 
     try{
@@ -93,8 +71,6 @@ function Invoke-ExecGetAzureBillingCharges {
         }
 
         $monthFilter = ([DateTime]::ParseExact($request.Query.date,'yyyyMMdd',$null).ToString('yyyy-MM'))
-
-        $hdrAuth = @{apikey = $SCRIPT:authKey; secret = $secret}
 
         $customers = GetArrowCustomers -hdrAuth $hdrAuth
 
@@ -389,20 +365,6 @@ function GetAzureConsumptionMonthSplit {
         Write-LogMessage -sev Error -API 'Azure Billing' -message "Error in GetAzureConsumptionMonthSplit: $($_.Exception.Message)"
         return $null
     }
-}
-
-function GetSecret {
-    $secret = ''
-
-    if (!$ENV:ArrowSecret) {
-        $null = Connect-AzAccount -Identity
-        $secret = (Get-AzKeyVaultSecret -VaultName $ENV:WEBSITE_DEPLOYMENT_ID -Name 'AzureBilling' -AsPlainText)
-    } else {
-        $secret = $ENV:ArrowSecret
-    }
-
-
-    return $secret
 }
 
 class consumptionMonthLine {

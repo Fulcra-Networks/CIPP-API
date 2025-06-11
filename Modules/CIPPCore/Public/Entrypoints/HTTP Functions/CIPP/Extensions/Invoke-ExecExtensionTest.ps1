@@ -62,6 +62,14 @@ Function Invoke-ExecExtensionTest {
                 $token = Get-AutotaskToken -configuration $Configuration.Autotask
                 $Results = [pscustomobject]@{ "Results" = "Succesfully Connected to Autotask" }
             }
+            "AzureBilling" {
+                $token = Get-AzureBillingToken -configuration $Configuration.AzureBilling
+                if ($token) {
+                    $Results = [pscustomobject]@{'Results' = 'Successfully Connected to AzureBilling' }
+                } else {
+                    $Results = [pscustomobject]@{'Results' = 'Failed to connect to AzureBilling, check your API credentials and try again.' }
+                }
+            }
             "NCentral" {
                 $token = ""
                 $Results = [pscustomobject]@{ "Results" = "Succesfully Connected to NCentral" }
