@@ -154,7 +154,7 @@ function Get-MappedUnmappedCharges {
     }
 
     #Expected final columns
-    #chargeDate	customerId	customer	ResourceGroup	price	Vendor	cost	atCustId	allocationCodeId	chargeName	contractId	appendGroup	billableToAccount	atSumGroup
+    #chargeDate_customerId_customer_ResourceGroup_price_Vendor_cost_atCustId_allocationCodeId_chargeName_contractId_appendGroup_billableToAccount_atSumGroup
     $azMonthSplit | ForEach-Object {
         $join = ("$($_.licenseRef.Trim()) - $($_.group.Trim())").ToUpper()
 
@@ -250,22 +250,22 @@ function Write-UnmappedToTable {
     param($table,$unmappedcharges)
 
     foreach ($line in $unmappedcharges) {
-        try {
-            $AddObject = @{
-                PartitionKey= ($line.chargeDate.replace('/','-'))
-                RowKey = "$($line.subscriptionId) - $($line."Resource Group")"
-                customer = $line.customer
-                subscriptionId = $line.subscriptionId
-                "Resource Group"= $line."Resource Group"
-                price = $line.price
-                cost = $line.cost
-                vendor = $line.vendor
-            }
+        $AddObject = @{
+            PartitionKey= ($line.chargeDate.replace('/','-'))
+            RowKey = "$($line.subscriptionId) - $($line."Resource Group")"
+            customer = $line.customer
+            subscriptionId = $line.subscriptionId
+            "Resource Group"= $line."Resource Group"
+            price = $line.price
+            cost = $line.cost
+            vendor = $line.vendor
+        }
 
+        try {
             Add-CIPPAzDataTableEntity @table -Entity $AddObject -Force
             Write-LogMessage -sev Debug -API 'Azure Billing' -message "Added unmapped billing for $($line.customer)"
         } catch {
-            Write-LogMessage -sev Error -API 'Azure Billing' -message "Error writing charges to table $($_.Exception.Message)"
+            Write-LogMessage -sev Error -API 'Azure Billing' -message "Error writing charges to table $($_.Exception.Message) - $($AddObject|ConvertTo-Json -depth 5 -Compress)"
         }
     }
 }
