@@ -30,7 +30,7 @@ function Invoke-ExecGetAzureUnmappedCharges {
                 chargeDate          = $unmappedCharge.PartitionKey
                 customerId          = $unmappedCharge.subscriptionId
                 customer            = $unmappedCharge.customer
-                'Resource Group'    = $unmappedCharge.'Resource Group'
+                'Resource Group'    = $unmappedCharge.ResourceGroup
                 price               = $unmappedCharge.price
                 cost                = $unmappedCharge.cost
             }

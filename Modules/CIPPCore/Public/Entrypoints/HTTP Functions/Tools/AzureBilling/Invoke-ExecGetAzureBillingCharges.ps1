@@ -145,7 +145,7 @@ function Get-MappedUnmappedCharges {
     $atMappingHashTable = @{}
     $atMapping| ForEach-Object {
         if([string]::IsNullOrEmpty($_.PartitionKey) -or [string]::IsNullOrEmpty($_.paxResourceGroupName)) {
-            Write-Host "$('*'*60) Empty PartitionKey or paxResourceGroupName..."
+            continue
         }
         else {
             $join = ("$($_.PartitionKey.Trim()) - $($_.paxResourceGroupName.Trim())").ToUpper()
@@ -162,7 +162,6 @@ function Get-MappedUnmappedCharges {
             $chargeDate = [DateTime]::ParseExact("$($_.PartitionKey)-28",'yyyy-MM-dd',$null).ToString("MM/dd/yyyy")
         }
         else {
-            Write-Host "$('*'*60) Bad chargedate value"
             continue
         }
 
@@ -213,23 +212,21 @@ function Write-ChargesToTable {
     foreach ($line in $azMonthSplit.lines) {
 
         try {
-            Write-Host "$('*'*60)Writing Mapped to storage table, Resource Group: $($line.group)"
-
             switch ($($line.group)) {
                 "N/A" {$line.group = "NA"; break}
             }
 
             $AddObject = @{
                 PartitionKey= $line.month
-                RowKey = "$($line.licenseRef) - $($line.group)"
-                currency = $line.currency
-                customer = $line.customer
-                customerRef = $line.customerRef
-                group = $line.group
-                licenseRef = $line.licenseRef
-                totalCustomer = $line.totalCustomer
-                totalList = $line.totalList
-                totalReseller = $line.totalReseller
+                RowKey          = "$($line.licenseRef) - $($line.group)"
+                currency        = $line.currency
+                customer        = $line.customer
+                customerRef     = $line.customerRef
+                group           = $line.group
+                licenseRef      = $line.licenseRef
+                totalCustomer   = $line.totalCustomer
+                totalList       = $line.totalList
+                totalReseller   = $line.totalReseller
             }
 
 
@@ -251,21 +248,21 @@ function Write-UnmappedToTable {
 
     foreach ($line in $unmappedcharges) {
         $AddObject = @{
-            PartitionKey= ($line.chargeDate.replace('/','-'))
-            RowKey = "$($line.subscriptionId) - $($line."Resource Group")"
-            customer = $line.customer
-            subscriptionId = $line.subscriptionId
-            "Resource Group"= $line."Resource Group"
-            price = $line.price
-            cost = $line.cost
-            vendor = $line.vendor
+            PartitionKey    = ($line.chargeDate.replace('/','-'))
+            RowKey          = "$($line.subscriptionId) - $($line."Resource Group")"
+            customer        = $line.customer
+            subscriptionId  = $line.subscriptionId
+            ResourceGroup   = $line."Resource Group"
+            price           = $line.price
+            cost            = $line.cost
+            vendor          = $line.vendor
         }
 
         try {
             Add-CIPPAzDataTableEntity @table -Entity $AddObject -Force
             Write-LogMessage -sev Debug -API 'Azure Billing' -message "Added unmapped billing for $($line.customer)"
         } catch {
-            Write-LogMessage -sev Error -API 'Azure Billing' -message "Error writing charges to table $($_.Exception.Message) - $($AddObject|ConvertTo-Json -depth 5 -Compress)"
+            Write-LogMessage -sev Error -API 'Azure Billing' -message "Error writing unmapped charges to table $($_.Exception.Message)"
         }
     }
 }
