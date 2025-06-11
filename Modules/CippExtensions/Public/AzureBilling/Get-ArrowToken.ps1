@@ -26,7 +26,7 @@ Function Get-AzureBillingToken {
         }
     }
     catch{
-        Write-LogMessage -Sev Error -API 'AzureBilling' -Message "Error connecting to AzureBilling API. $($_.Exception.Message)"
+        Write-LogMessage -Sev Error -API 'Azure Billing' -Message "Error connecting to AzureBilling API. $($_.Exception.Message)"
         return $null
     }
 
