@@ -6,12 +6,14 @@ Function Get-AzureBillingToken {
     $secret = GetAzureBillingSecret
 
     if([string]::IsNullOrEmpty($secret)){
-        write-host "$('*'*60) No API secret"
         return $null
     }
 
     if([string]::IsNullOrEmpty($Configuration.AzureBilling.APIAuthKey)){
-        write-host "$('*'*60) No API Auth Key"
+        return $null
+    }
+
+    if([string]::IsNullOrEmpty($Configuration.AzureBilling.CompanyName)){
         return $null
     }
 
@@ -23,14 +25,13 @@ Function Get-AzureBillingToken {
             -Headers $hdrAuth
 
         #TODO Add to configuration
-        if($res.data.companyName -ne 'FULCRA NETWORKS LLC'){
+        if($res.data.companyName -ne $Configuration.AzureBilling.CompanyName){
             write-host "$('*'*60) Bad response from API"
             return $null
         }
     }
     catch{
         Write-LogMessage -Sev Error -API 'Azure Billing' -Message "Error connecting to AzureBilling API. $($_.Exception.Message)"
-        write-host "$('*'*60) $($_.Exception.Message)"
         return $null
     }
 

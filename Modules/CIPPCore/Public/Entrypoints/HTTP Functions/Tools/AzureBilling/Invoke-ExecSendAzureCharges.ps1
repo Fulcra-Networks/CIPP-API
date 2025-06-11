@@ -14,22 +14,6 @@ function Invoke-ExecSendAzureCharges {
 
     Get-AutotaskToken -configuration $CfgExtensionTbl.Autotask
 
-    if (!$ENV:AzBillingConnStr) {
-        $null = Connect-AzAccount -Identity
-        $AzBillingConnStr = (Get-AzKeyVaultSecret -VaultName $ENV:WEBSITE_DEPLOYMENT_ID -Name 'AzStorageConnStr' -AsPlainText)
-    } else {
-        $AzBillingConnStr = $ENV:AzBillingConnStr
-    }
-
-    if($null -eq $AzBillingConnStr){
-        Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
-            StatusCode = [HttpStatusCode]::BadRequest
-            Body       = @("Error getting Az Billing table.")
-        })
-        return
-    }
-
-
     $billingContext = Get-CIPPTable -tablename AzureBillingRawCharges #Get-AzTableContext -connectionStr $AzBillingConnStr
     $atMappingContext = Get-CIPPTable -tablename AzureBillingMapping
     $atMappingRows = Get-CIPPAzDataTableEntity @atMappingContext
