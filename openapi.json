@@ -5005,6 +5005,85 @@
         }
       }
     },
+    "/ExecListPSACompanies":{
+      "get":{
+        "description":"GetPSACompanies",
+        "summary": "GetPSACompanies",
+        "tags": [],
+        "parameters": [
+          {
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "name": "TenantFilter",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {},
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful operation"
+          }
+        }
+      }
+    },
+    "/ExecListPSABillingCodes":{
+      "get":{
+        "description":"Get PSA Billing Codes",
+        "summary": "Retrieves a list of billing codes.",
+        "tags": [],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {},
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful operation"
+          }
+        }
+      }
+    },
+    "/ExecListPSACompanyContracts":{
+      "get":{
+        "description":"GetPSACompanyContracts",
+        "summary": "GetPSACompanyContracts",
+        "tags": [],
+        "parameters": [
+          {
+            "required": true,
+            "schema": { "type":"string"},
+            "name":"companyId",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {},
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful operation"
+          }
+        }
+      }
+    },
     "/ExecSendAzureCharges":{
       "get":{
         "description":"SendAzureCharges",

@@ -142,6 +142,12 @@ function Get-MappedUnmappedCharges {
         if($atMappingHashTable.Contains($join)){
             $mapping = $atMappingHashTable[$join]
 
+            $price = $_.totalList
+
+            if($mapping.markup){
+                $price += ($price * $mapping.markup)
+            }
+
             if($mapping.billableToAccount){
 
                 $body += @{
@@ -150,7 +156,7 @@ function Get-MappedUnmappedCharges {
                     customer            = $_.customer
                     subscriptionId      = $_.licenseRef
                     "Resource Group"    = ($_.group.toupper())
-                    price               = $_.totalList
+                    price               = $price
                     cost                = $_.totalReseller
                     vendor              = "Arrow"
                     atCustId            = $mapping.atCustId
@@ -198,9 +204,9 @@ function Write-ChargesToTable {
                 customerRef     = $line.customerRef
                 group           = $line.group
                 licenseRef      = $line.licenseRef
-                totalCustomer   = $line.totalCustomer
-                totalList       = $line.totalList
-                totalReseller   = $line.totalReseller
+                totalCustomer   = ([math]::Round($line.totalCustomer,2))
+                totalList       = ([math]::Round($line.totalList,2))
+                totalReseller   = ([math]::Round($line.totalReseller,2))
             }
 
             if([bool]::Parse($rerun)){
@@ -226,8 +232,8 @@ function Write-UnmappedToTable {
             customer        = $line.customer
             subscriptionId  = $line.subscriptionId
             ResourceGroup   = $line."Resource Group"
-            price           = $line.price
-            cost            = $line.cost
+            price           = ([math]::Round($line.price,2))
+            cost            = ([math]::Round($line.cost,2))
             vendor          = $line.vendor
         }
 

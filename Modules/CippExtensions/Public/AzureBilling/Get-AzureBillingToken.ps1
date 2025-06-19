@@ -24,7 +24,6 @@ Function Get-AzureBillingToken {
             -Method 'GET' `
             -Headers $hdrAuth
 
-        #TODO Add to configuration
         if($res.data.companyName -ne $Configuration.AzureBilling.CompanyName){
             write-host "$('*'*60) Bad response from API"
             return $null
