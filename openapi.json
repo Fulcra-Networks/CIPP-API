@@ -5005,6 +5005,42 @@
         }
       }
     },
+    "/ExecListAzureBillingCompanies":{
+      "get":{
+        "description":"Gets Company list from Arrow",
+        "summary": "Retrieve all companies from Azure Arrow API",
+        "tags": [],
+        "parameters": [
+          {
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "name": "TenantFilter",
+            "in": "query"
+          },
+          {
+            "required": true,
+            "schema": { "type":"string"},
+            "name":"date",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {},
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful operation"
+          }
+        }
+      }
+    },
     "/ExecListPSACompanies":{
       "get":{
         "description":"GetPSACompanies",

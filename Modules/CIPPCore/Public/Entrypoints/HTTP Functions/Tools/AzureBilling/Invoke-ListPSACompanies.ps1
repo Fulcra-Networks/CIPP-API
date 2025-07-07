@@ -22,7 +22,6 @@ Function Invoke-ListPSACompanies {
             'Autotask' {
                 If ($Configuration.Autotask.enabled) {
                     $Result = Get-AutotaskCompanies
-                    $Result = $Result | Select-Object { $_.id, $_.companyName}
                 }
             }
             'HaloPSA' {
@@ -33,8 +32,6 @@ Function Invoke-ListPSACompanies {
             }
         }
     }
-
-    Write-Host "$('*'*60)-$($Result|ConvertTo-JSON -Depth 5)"
 
     # Associate values to output bindings by calling 'Push-OutputBinding'.
     Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
