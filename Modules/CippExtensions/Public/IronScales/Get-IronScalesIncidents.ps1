@@ -72,7 +72,7 @@ function New-IronScalestickets {
 
 function Get-ExistingTicket {
     param($TicketTitle)
-    $query = (Get-TicketQueryFilter $TicketTitle|ConvertTo-Json -Depth 10)
+    $query = (Get-TicketQueryFilter $TicketTitle|ConvertTo-Json -Depth 10 -Compress)
 
     $ticket = Get-AutotaskAPIResource -Resource Tickets -SearchQuery $query
 
@@ -85,14 +85,19 @@ function Get-TicketQueryFilter {
     $field1 = "title"
     $value1 = $TicketTitle
     $field2 = "status"
-    $value2 = "1"
+    $value2 = @("1","7","8","12")
+    <#  New                 1
+        Waiting Customer    7
+        In Progress         8
+        Waiting Vendor      12
+    #>
     $item1 = [PSCustomObject]@{
         op = "contains"
         field = $field1
         value = $value1
     }
     $item2 = [PSCustomObject]@{
-        op = "eq"
+        op = "in"
         field = $field2
         value = $value2
     }
