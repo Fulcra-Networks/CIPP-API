@@ -115,8 +115,8 @@ function Set-PSAAssetDetail {
                 #update the AT configuration item
                 $body = [PSCustomObject]@{ userDefinedFields = [System.Collections.ArrayList]::new() }
                 $body.userDefinedFields.add([pscustomobject]@{"name" = "RAM"; "value" = "$([math]::Round($NCDevice.data.computersystem.totalphysicalmemory/([Math]::Pow(1024,3))))GB"})|Out-Null
-                $body.userDefinedFields.add([pscustomobject]@{"name" = "CPU"; "value" =  "$($NCDevice.data.processor.name) (x$($NCDevice.processor.numberofcpus))"})|Out-Null
-                $body.userDefinedFields.add([pscustomobject]@{"name" = "Last Boot Time"; "value" = "$($NCDevice.data.os.lastbootuptime)"})|Out-Null
+                $body.userDefinedFields.add([pscustomobject]@{"name" = "CPU"; "value" =  "$($NCDevice.data.processor.name) (x$($NCDevice.data.processor.numberofcpus))"})|Out-Null
+                $body.userDefinedFields.add([pscustomobject]@{"name" = "Last Boot Time"; "value" = "$($NCDevice.data._extra.os.lastbootuptime)"})|Out-Null
                 $body.userDefinedFields.add([pscustomobject]@{"name" = "OS"; "value" = $NCDevice.data.os.reportedos})|Out-Null
                 $body.userDefinedFields.add([pscustomobject]@{"name" = "OS Architecture"; "value" = $NCDevice.data.os.osarchitecture})|Out-Null
                 $body.userDefinedFields.add([pscustomobject]@{"name" = "Version"; "value" = $NCDevice.data.os.version})|Out-Null
