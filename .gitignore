@@ -13,3 +13,7 @@ SendNotifications/config.json
 .vscode/settings.json
 .vscode/tasks.json
 .env
+
+
+# Cursor IDE
+.cursor/rules
