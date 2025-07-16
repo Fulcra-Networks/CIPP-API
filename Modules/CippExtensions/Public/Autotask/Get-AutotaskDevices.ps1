@@ -5,7 +5,7 @@ function Get-AutotaskDevices {
     $ExtensionMappings = Get-ExtensionMapping -Extension 'Autotask'
 
     try{
-        $Table = Get-CIPPTable -TableName ExtensionsConfig
+        $Table = Get-CIPPTable -TableName Extensionsconfig
         $Configuration = ((Get-CIPPAzDataTableEntity @Table).config | ConvertFrom-Json -ea stop).Autotask
 
         $ATCustomerID = $ExtensionMappings | Where-Object { $_.rowKey -eq $tenantId } | Select-Object -ExpandProperty IntegrationId

@@ -20,12 +20,13 @@ Function Set-AssetManagementData {
         return "Cannot run job for all Tenants."
     }
 
+    write-host "$('~'*60)> 1"
     $TblTenant = Get-CIPPTable -TableName Tenants
     $Tenants = Get-CIPPAzDataTableEntity @TblTenant -Filter "PartitionKey eq 'Tenants'"
 
     $tenantId = $Tenants | Where-Object { $_.defaultDomainName -eq $TenantFilter } | Select-Object -ExpandProperty RowKey
-
-    $Table = Get-CIPPTable -TableName ExtensionsConfig
+    write-host "$('~'*60)> 2"
+    $Table = Get-CIPPTable -TableName Extensionsconfig
     $Configuration = (Get-CIPPAzDataTableEntity @Table).config | ConvertFrom-Json -Depth 10
 
     $cfgPSA = Get-PSAConfig $Configuration
@@ -35,7 +36,7 @@ Function Set-AssetManagementData {
     }
 
     $cfgRMM = Get-RMMConfig $Configuration
-    if(!$cfgPSA){
+    if(!$cfgRMM){
         Write-LogMessage -API 'Set-AssetManagementData' -message 'No RMM configured.' -sev Info
         return 'No RMM Configured'
     }
@@ -43,23 +44,120 @@ Function Set-AssetManagementData {
     <#Expected object format
         [string]name, [string]serial, [int]psaId, [int]rmmId, [string]contract
     #>
+    write-host "$('~'*60)> 3"
     Switch ($cfgPSA.Name) {
         'Autotask' {
-            $PSADevices = Get-AutotaskDevices -tenantId $tenantId
+            UpdateAutoTaskDevices $tenantId
         }
         'HaloPSA' {
             $PSADevices = @()
         }
     }
 
+    write-host "$('~'*60)> 4"
     Switch ($cfgRMM.Name) {
         'NCentral' {
-            $RMMDevices = Get-NCentralDevices -tenantId $tenantId
+            UpdateNCentralDevices $tenantId
         }
         'NinjaOne' {
             $RMMDevices = @()
         }
     }
+}
+
+Function UpdateAutoTaskDevices {
+    param($tenantId)
+
+    $PSADevices = Get-AutotaskDevices -tenantId $tenantId
+
+    $Table = Get-CIPPTable -TableName AssetsPSA
+    # if($existing = Get-CIPPAzDataTableEntity @Table -Filter "PartitionKey eq '$($tenantId)'") {
+    #     write-host "$('~'*60)> Removing expired PSA asset entities."
+    #     $existing | ForEach-Object {
+    #         Remove-AzDataTableEntity -Force @Table -Entity $_
+    #     }
+    # }
+
+    foreach($device in $PSADevices){
+        $addObject = [PSCustomObject]@{
+            PartitionKey    = [string]$tenantId
+            RowKey          = "AutoTask-$($device.psaId)"
+            LastRefresh     = [datetime]::UtcNow
+            Name            = [string]$device.name
+            Contract        = [string]$device.contract
+            SerialNumber    = [string]$device.serialNumber
+            Id              = [string]$device.psaId
+        }
+
+        Add-CIPPAzDataTableEntity @Table -Entity $AddObject -Force
+    }
+}
+
+Function UpdateNCentralDevices {
+    param($tenantId)
+
+    $RMMDevices = Get-NCentralDevices -tenantId $tenantId
+
+    $Table = Get-CIPPTable -TableName AssetsRMM
+    # if($existing = Get-CIPPAzDataTableEntity @Table -Filter "PartitionKey eq '$($tenantId)'") {
+    #     $existing | ForEach-Object {
+    #         write-host "$('~'*60)> Removing expired RMM asset entities."
+    #         Remove-AzDataTableEntity -Force @Table -Entity $_
+    #     }
+    # }
+
+    foreach($RMMDevice in $RMMDevices){
+        $addObject = [PSCustomObject]@{
+            PartitionKey    = [string]$tenantId
+            RowKey          = "NCentral-$($RMMDevice.Id)"
+            LastRefresh     = [datetime]::UtcNow
+            Name            = $RMMDevice.Name
+            SerialNumber    = $RMMDevice.SerialNumber
+            Id              = $RMMDevice.Id
+        }
+
+        Add-CIPPAzDataTableEntity @Table -Entity $AddObject -Force
+    }
+}
+
+Function Get-PSAConfig {
+    param($Configuration)
+
+    if($PSAConfig = $Configuration.Autotask){
+        return [PSCustomObject]@{
+            Name = 'Autotask'
+            Config = $PSAConfig
+        }
+    }
+    elseif($PSAConfig = $Configuration.HaloPSA){
+        return [PSCustomObject]@{
+            Name = 'HaloPSA'
+            Config = $PSAConfig
+        }
+    }
+    return $null
+}
+
+Function Get-RMMConfig {
+    param($Configuration)
+
+    if($RMMConfig = $Configuration.NinjaOne){
+        return [PSCustomObject]@{
+            Name = 'NinjaOne'
+            Config = $RMMConfig
+        }
+    }
+    elseif($RMMConfig = $Configuration.NCentral){
+        return [PSCustomObject]@{
+            Name = 'NCentral'
+            Config = $RMMConfig
+        }
+    }
+    return $null
+}
+
+
+<# Old Matching Code
 
     $MatchedDevices = @()
     $UnmatchedPSADevices = @()
@@ -122,40 +220,4 @@ Function Set-AssetManagementData {
     }
 
     Add-CIPPAzDataTableEntity @Table -Entity $AddObject -Force
-}
-
-Function Get-PSAConfig {
-    param($Configuration)
-
-    if($PSAConfig = $Configuration.Autotask){
-        return [PSCustomObject]@{
-            Name = 'Autotask'
-            Config = $PSAConfig
-        }
-    }
-    elseif($PSAConfig = $Configuration.HaloPSA){
-        return [PSCustomObject]@{
-            Name = 'HaloPSA'
-            Config = $PSAConfig
-        }
-    }
-    return $null
-}
-
-Function Get-RMMConfig {
-    param($Configuration)
-
-    if($RMMConfig = $Configuration.NinjaOne){
-        return [PSCustomObject]@{
-            Name = 'NinjaOne'
-            Config = $RMMConfig
-        }
-    }
-    elseif($RMMConfig = $Configuration.NCentral){
-        return [PSCustomObject]@{
-            Name = 'NCentral'
-            Config = $RMMConfig
-        }
-    }
-    return $null
-}
+#>
