@@ -6,8 +6,7 @@ function Invoke-ExecGetAzureBillingCharges {
     [CmdletBinding()]
     param($Request, $TriggerMetadata)
 
-
-    if ([String]::IsNullOrEmpty($request.Query.date)) {
+    if ([String]::IsNullOrEmpty($request.Query.billMonth)) {
         $body = @("No date set")
         Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
             StatusCode = [HttpStatusCode]::BadRequest
@@ -23,7 +22,7 @@ function Invoke-ExecGetAzureBillingCharges {
         $body = @("Extension is not configured")
         Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
             StatusCode = [HttpStatusCode]::BadRequest
-            Body       = $body
+            Body       = @($body)
         })
         return  # Short-circuit the function
     }
@@ -36,7 +35,7 @@ function Invoke-ExecGetAzureBillingCharges {
         $body = @("Could not get authentication data")
         Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
             StatusCode = [HttpStatusCode]::BadRequest
-            Body       = $body
+            Body       = @($body)
         })
         return  # Short-circuit the function
     }
@@ -45,6 +44,7 @@ function Invoke-ExecGetAzureBillingCharges {
         $billingContext = Get-CIPPTable -tablename AzureBillingRawCharges
         $atMappingContext = Get-CIPPTable -tablename AzureBillingMapping
         $atUnmappedContext = Get-CIPPTable -tablename AzureBillingUnmappedCharges
+        $atMappingRows = Get-CIPPAzDataTableEntity @atMappingContext
 
         if($atMappingRows.count -eq 0){
             Write-LogMessage -sev Info -API 'Azure Billing' -message "Got no rows from AutotaskAzureMapping"
@@ -57,7 +57,7 @@ function Invoke-ExecGetAzureBillingCharges {
         $body = @()
 
         if([bool]::Parse($request.Query.rerunJob) -eq $false){
-            $existingData = Get-ExistingBillingData -table $billingContext -date $request.Query.date
+            $existingData = Get-ExistingBillingData -table $billingContext -date $request.Query.billMonth
             if($existingData.count -gt 0){
                 Write-LogMessage -sev Info -API "Azure Billing" -message "Existing records found and rerun not requested."
                 $mappedUnmapped = Get-MappedUnmappedCharges -azMonthSplit $existingData -body $body -atMapping $atMappingRows
@@ -70,16 +70,16 @@ function Invoke-ExecGetAzureBillingCharges {
             }
         }
 
-        $monthFilter = ([DateTime]::ParseExact($request.Query.date,'yyyyMMdd',$null).ToString('yyyy-MM'))
+        $monthFilter = ([DateTime]::ParseExact($request.Query.billMonth,'yyyyMMdd',$null).ToString('yyyy-MM'))
 
         $customers = GetArrowCustomers -hdrAuth $hdrAuth
 
         $targetSKUs = $CfgExtensionTbl.AzureBilling.SKU.split(',')
 
         foreach ($cust in $customers){
-            if ($cust.Reference -match $CfgExtensionTbl.AzureBilling.ExcludeCust) {
-                continue
-            }
+            #if ($cust.Reference -match $CfgExtensionTbl.AzureBilling.ExcludeCust) {
+            #    continue
+            #}
 
             $subscriptions = GetCustLicenses -custId $cust.Reference -hdrAuth $hdrAuth
             $subscriptions = $subscriptions |Where-Object {$targetSKUs -contains $_.sku} #"MS-AZR-0145P"
@@ -95,8 +95,8 @@ function Invoke-ExecGetAzureBillingCharges {
             }
         }
 
-        $atMappingRows = Get-CIPPAzDataTableEntity @atMappingContext
-        $data = Get-ExistingBillingData -table $billingContext -date $request.Query.date
+
+        $data = Get-ExistingBillingData -table $billingContext -date $request.Query.billMonth
         $mappedUnmapped = Get-MappedUnmappedCharges -azMonthSplit $data -body $body -atMapping $atMappingRows
         $body = $mappedUnmapped.mapped
 
@@ -109,7 +109,7 @@ function Invoke-ExecGetAzureBillingCharges {
 
     Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
         StatusCode = [HttpStatusCode]::OK
-        Body       = $body
+        Body       = @($body)
     })
 }
 
@@ -148,25 +148,25 @@ function Get-MappedUnmappedCharges {
                 $price += ($price * $mapping.markup)
             }
 
-            if($mapping.billableToAccount){
+            # if($mapping.billableToAccount){
+            # }
 
-                $body += @{
-                    chargeDate          = $chargeDate
-                    customerId          = $_.customerRef
-                    customer            = $_.customer
-                    subscriptionId      = $_.licenseRef
-                    "Resource Group"    = ($_.group.toupper())
-                    price               = $price
-                    cost                = $_.totalReseller
-                    vendor              = "Arrow"
-                    atCustId            = $mapping.atCustId
-                    allocationCodeId    = $mapping.allocationCodeId
-                    chargeName          = $mapping.chargeName
-                    appendGroup         = $mapping.appendGroup
-                    contractId          = $mapping.contractId
-                    billableToAccount   = $mapping.billableToAccount
-                    atSumGroup          = $mapping.atSumGroup
-                }
+            $body += @{
+                chargeDate          = $chargeDate
+                customerId          = $_.customerRef
+                customer            = $_.customer
+                subscriptionId      = $_.licenseRef
+                "Resource Group"    = ($_.group.toupper())
+                price               = $price
+                cost                = $_.totalReseller
+                vendor              = "Arrow"
+                atCustId            = $mapping.atCustId
+                allocationCodeId    = $mapping.allocationCodeId
+                chargeName          = $mapping.chargeName
+                appendGroup         = $mapping.appendGroup
+                contractId          = $mapping.contractId
+                billableToAccount   = $mapping.billableToAccount
+                atSumGroup          = $mapping.atSumGroup
             }
         }
         else {

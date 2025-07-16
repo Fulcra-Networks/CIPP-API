@@ -5,7 +5,7 @@ function Invoke-ExecGetAzureUnmappedCharges {
     [CmdletBinding()]
     param($Request, $TriggerMetadata)
 
-    if ([String]::IsNullOrEmpty($request.Query.date)) {
+    if ([String]::IsNullOrEmpty($request.Query.billMonth)) {
         $body = @("No date set")
         Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
             StatusCode = [HttpStatusCode]::BadRequest
@@ -16,7 +16,7 @@ function Invoke-ExecGetAzureUnmappedCharges {
 
     try{
         #Unmapped charges are always the 28th of the month (04-28-2025)
-        $monthFilter = [DateTime]::ParseExact($request.Query.date,'yyyyMMdd',$null)
+        $monthFilter = [DateTime]::ParseExact($request.Query.billMonth,'yyyyMMdd',$null)
         $monthFilter = [DateTime]::New($monthFilter.Year,$monthFilter.Month, 28)
 
         $atUnmappedContext = Get-CIPPTable -tablename AzureBillingUnmappedCharges
