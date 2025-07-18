@@ -7,9 +7,6 @@ function Get-CIPPTenantCapabilities {
         $Headers
     )
 
-
-    Write-LogMessage -API $APIName -tenant $TenantFilter -message "Getting Tenant Capabilities: $TenantFilter)" -sev Info
-
     $ConfigTable = Get-CIPPTable -TableName 'CacheCapabilities'
     $datetime = (Get-Date).AddDays(-1).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
     $ConfigEntries = Get-CIPPAzDataTableEntity @ConfigTable -Filter "RowKey eq '$TenantFilter' and Timestamp ge datetime'$datetime'"
@@ -28,7 +25,6 @@ function Get-CIPPTenantCapabilities {
     $Plans = $Org.servicePlans | Where-Object { $_.provisioningStatus -eq 'Success' } | Sort-Object -Property serviceplanName -Unique | Select-Object servicePlanName, provisioningStatus
     $Results = @{}
     foreach ($Plan in $Plans) {
-        Write-LogMessage -API $APIName -tenant $TenantFilter -message "Tenant Capability: $($Plan.servicePlanName)-$($Plan.provisioningStatus))" -sev Info
         $Results."$($Plan.servicePlanName)" = $Plan.provisioningStatus -eq 'Success'
     }
     [PSCustomObject]$Results
