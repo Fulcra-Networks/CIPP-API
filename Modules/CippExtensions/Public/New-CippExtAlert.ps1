@@ -6,12 +6,12 @@ function New-CippExtAlert {
     )
     #Get the current CIPP Alerts table and see what system is configured to receive alerts
     $Table = Get-CIPPTable -TableName Extensionsconfig
-    $Configuration = (Get-CIPPAzDataTableEntity @Table).config | ConvertFrom-Json -Depth 10
+    $Configuration = (Get-CIPPAzDataTableEntity @Table).config | ConvertFrom-Json -Depth 10 -ErrorAction SilentlyContinue
     $MappingTable = Get-CIPPTable -TableName CippMapping
 
     foreach ($ConfigItem in $Configuration.psobject.properties.name) {
         switch ($ConfigItem) {
-            "Autotask" {
+            'Autotask' {
                 If ($Configuration.Autotask.enabled) {
                     $TenantId = (Get-Tenants | Where-Object defaultDomainName -EQ $Alert.TenantId).customerId
                     $MappingFile = Get-ExtensionMapping -Extension 'Autotask'
@@ -35,8 +35,8 @@ function New-CippExtAlert {
                         -subIssueType "327" #Service Management/Other
                 }
             }
-            "HaloPSA" {
-                If ($Configuration.HaloPSA.enabled) {
+            'HaloPSA' {
+                if ($Configuration.HaloPSA.enabled) {
                     $MappingFile = Get-CIPPAzDataTableEntity @MappingTable -Filter "PartitionKey eq 'HaloMapping'"
                     $TenantId = (Get-Tenants | Where-Object defaultDomainName -EQ $Alert.TenantId).customerId
                     Write-Host "TenantId: $TenantId"
@@ -48,7 +48,7 @@ function New-CippExtAlert {
                 }
             }
             'Gradient' {
-                If ($Configuration.Gradient.enabled) {
+                if ($Configuration.Gradient.enabled) {
                     New-GradientAlert -Title $Alert.AlertTitle -Description $Alert.AlertText -Client $Alert.TenantId
                 }
             }

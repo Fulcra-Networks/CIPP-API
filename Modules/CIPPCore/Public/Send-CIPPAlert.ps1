@@ -7,6 +7,8 @@ function Send-CIPPAlert {
         $HTMLContent,
         $JSONContent,
         $TenantFilter,
+        $altEmail,
+        $altWebhook,
         $APIName = 'Send Alert',
         $Headers,
         $TableName,
@@ -74,16 +76,17 @@ function Send-CIPPAlert {
         Write-Information 'Trying to send webhook'
 
         try {
-            if ($Config.webhook -ne '') {
+            if ($Config.webhook -ne '' -or $AltWebhook -ne '') {
                 if ($PSCmdlet.ShouldProcess($Config.webhook, 'Sending webhook')) {
-                    switch -wildcard ($config.webhook) {
+                    $webhook = if ($AltWebhook) { $AltWebhook } else { $Config.webhook }
+                    switch -wildcard ($webhook) {
                         '*webhook.office.com*' {
                             $JSONBody = "{`"text`": `"You've setup your alert policies to be alerted whenever specific events happen. We've found some of these events in the log. <br><br>$JSONContent`"}"
-                            Invoke-RestMethod -Uri $config.webhook -Method POST -ContentType 'Application/json' -Body $JSONBody
+                            Invoke-RestMethod -Uri $webhook -Method POST -ContentType 'Application/json' -Body $JSONBody
                         }
                         '*discord.com*' {
                             $JSONBody = "{`"content`": `"You've setup your alert policies to be alerted whenever specific events happen. We've found some of these events in the log. $JSONContent`"}"
-                            Invoke-RestMethod -Uri $config.webhook -Method POST -ContentType 'Application/json' -Body $JSONBody
+                            Invoke-RestMethod -Uri $webhook -Method POST -ContentType 'Application/json' -Body $JSONBody
                         }
                         '*slack.com*' {
                             $SlackBlocks = Get-SlackAlertBlocks -JSONBody $JSONContent
@@ -92,10 +95,10 @@ function Send-CIPPAlert {
                             } else {
                                 $JSONBody = "{`"text`": `"You've setup your alert policies to be alerted whenever specific events happen. We've found some of these events in the log. $JSONContent`"}"
                             }
-                            Invoke-RestMethod -Uri $config.webhook -Method POST -ContentType 'Application/json' -Body $JSONBody
+                            Invoke-RestMethod -Uri $webhook -Method POST -ContentType 'Application/json' -Body $JSONBody
                         }
                         default {
-                            Invoke-RestMethod -Uri $config.webhook -Method POST -ContentType 'Application/json' -Body $JSONContent
+                            Invoke-RestMethod -Uri $webhook -Method POST -ContentType 'Application/json' -Body $JSONContent
                         }
                     }
                 }
