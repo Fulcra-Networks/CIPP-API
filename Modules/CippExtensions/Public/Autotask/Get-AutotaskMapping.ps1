@@ -6,21 +6,8 @@ function Get-AutotaskMapping {
     #Get available mappings
     $Mappings = [pscustomobject]@{}
 
-    # Migrate legacy mappings
-    $Filter = "PartitionKey eq 'Mapping'"
-    $MigrateRows = Get-CIPPAzDataTableEntity @CIPPMapping -Filter $Filter | ForEach-Object {
-        [PSCustomObject]@{
-            PartitionKey    = 'AutotaskMapping'
-            RowKey          = $_.RowKey
-            IntegrationId   = $_.AutotaskPSA
-            IntegrationName = $_.AutotaskPSAName
-        }
-        Remove-AzDataTableEntity -Force @CIPPMapping -Entity $_ | Out-Null
-    }
-    if (($MigrateRows | Measure-Object).Count -gt 0) {
-        Add-CIPPAzDataTableEntity @CIPPMapping -Entity $MigrateRows -Force
-    }
 
+    try{
     $ExtensionMappings = Get-ExtensionMapping -Extension 'Autotask'
     $Tenants = Get-Tenants -IncludeErrors
 
@@ -39,7 +26,7 @@ function Get-AutotaskMapping {
 
     $Table = Get-CIPPTable -TableName Extensionsconfig
 
-    $RawAutotaskCustomers = Invoke-GetAutotaskCompanies
+    $RawAutotaskCustomers = Get-AutotaskCompanies
 
     $AutotaskCustomers = $RawAutotaskCustomers | Sort-Object -Property companyName | ForEach-Object {
         [PSCustomObject]@{
@@ -55,4 +42,8 @@ function Get-AutotaskMapping {
 
     Write-LogMessage -Message "Returning Mapping Data: $($MappingObj|ConvertTo-Json -Depth 10 -Compress)" -sev Info -tenant 'CIPP' -API 'AutotaskMapping'
     return $MappingObj
+}
+catch {
+    Write-Host "Exception $($_.Exception.Message)"
+}
 }
