@@ -48,7 +48,7 @@ function Invoke-ExecSendAzureCharges {
             $atCharge.status                = 6 # Delivered/Shipped Full
             $atCharge.unitQuantity          = 1
 
-            #New-AutotaskAPIResource -Resource ContractCharges -Body $atCharge
+            New-AutotaskAPIResource -Resource ContractCharges -Body $atCharge
             $results += $atCharge
 
             $sentCharge = @{
