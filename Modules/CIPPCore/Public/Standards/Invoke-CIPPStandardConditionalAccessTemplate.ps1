@@ -32,7 +32,7 @@ function Invoke-CIPPStandardConditionalAccessTemplate {
     ##$Rerun -Type Standard -Tenant $Tenant -Settings $Settings 'ConditionalAccess'
     $Table = Get-CippTable -tablename 'templates'
     $TestResult = Test-CIPPStandardLicense -StandardName 'ConditionalAccessTemplate_general' -TenantFilter $Tenant -RequiredCapabilities @('AAD_PREMIUM', 'AAD_PREMIUM_P2')
-    $TestP2 = Test-CIPPStandardLicense -StandardName 'ConditionalAccessTemplate_p2' -TenantFilter $Tenant -RequiredCapabilities @('AAD_PREMIUM_P2')
+    $TestP2 =  $false#Test-CIPPStandardLicense -StandardName 'ConditionalAccessTemplate_p2' -TenantFilter $Tenant -RequiredCapabilities @('AAD_PREMIUM_P2')
     if ($TestResult -eq $false) {
         #writing to each item that the license is not present.
         $settings.TemplateList | ForEach-Object {
@@ -78,11 +78,11 @@ function Invoke-CIPPStandardConditionalAccessTemplate {
             $CheckExististing = $AllCAPolicies | Where-Object -Property displayName -EQ $Setting.label
             if (!$CheckExististing) {
                 if ($Setting.conditions.userRiskLevels.Count -gt 0 -or $Setting.conditions.signInRiskLevels.Count -gt 0) {
-                    if (!$TestP2) {
-                        Set-CIPPStandardsCompareField -FieldName "standards.ConditionalAccessTemplate.$($Setting.value)" -FieldValue "Policy $($Setting.label) requires AAD Premium P2 license." -Tenant $Tenant
-                    } else {
-                        Set-CIPPStandardsCompareField -FieldName "standards.ConditionalAccessTemplate.$($Setting.value)" -FieldValue "Policy $($Setting.label) is missing from this tenant." -Tenant $Tenant
-                    }
+                    #if (!$TestP2) {
+                    #    Set-CIPPStandardsCompareField -FieldName "standards.ConditionalAccessTemplate.$($Setting.value)" -FieldValue "Policy $($Setting.label) requires AAD Premium P2 license." -Tenant $Tenant
+                    #} else {
+                    #    Set-CIPPStandardsCompareField -FieldName "standards.ConditionalAccessTemplate.$($Setting.value)" -FieldValue "Policy $($Setting.label) is missing from this tenant." -Tenant $Tenant
+                    #}
                 } else {
                     Set-CIPPStandardsCompareField -FieldName "standards.ConditionalAccessTemplate.$($Setting.value)" -FieldValue "Policy $($Setting.label) is missing from this tenant." -Tenant $Tenant
                 }
