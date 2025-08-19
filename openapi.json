@@ -5175,6 +5175,27 @@
         }
       }
     },
+    "/ListPSAServices":{
+      "get":{
+        "description":"Get PSA Services List",
+        "summary": "Retrieves a list of psa services.",
+        "tags": [],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {},
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful operation"
+          }
+        }
+      }
+    },
     "/ExecListPSACompanyContracts":{
       "get":{
         "description":"GetPSACompanyContracts",
