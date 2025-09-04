@@ -59,6 +59,7 @@ function Invoke-CIPPStandardConditionalAccessTemplate {
                 if ($Policy.conditions.userRiskLevels.count -gt 0 -or $Policy.conditions.signInRiskLevels.count -gt 0) {
                     if (!$TestP2) {
                         Write-Information "Skipping policy $($Policy.displayName) as it requires AAD Premium P2 license."
+                        Set-CIPPStandardsCompareField -FieldName "standards.ConditionalAccessTemplate.$($Setting.value)" -FieldValue "Policy $($Policy.displayName) requires AAD Premium P2 license." -Tenant $Tenant
                         continue
                     }
                 }

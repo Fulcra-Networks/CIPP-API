@@ -27,7 +27,7 @@ Function Invoke-ExecExtensionMapping {
             'IronScales' {
                 $Result = Get-IronScalesMapping -CIPPMapping $Table
             }
-            'NCentral'{
+            'NCentral' {
                 $Result = Get-NCentralMapping -CIPPMapping $Table
             }
             'HaloPSA' {
@@ -50,7 +50,11 @@ Function Invoke-ExecExtensionMapping {
             }
             'HaloPSAFields' {
                 $TicketTypes = Get-HaloTicketType
-                $Result = @{'TicketTypes' = $TicketTypes }
+                $Outcomes = Get-HaloTicketOutcome
+                $Result = @{
+                    'TicketTypes' = $TicketTypes
+                    'Outcomes'    = $Outcomes
+                }
             }
             'PWPushFields' {
                 $Accounts = Get-PwPushAccount
@@ -73,7 +77,7 @@ Function Invoke-ExecExtensionMapping {
                 'IronScales' {
                     $Result = Set-IronScalesMapping -CIPPMapping $Table -APIName $APIName -Request $Request
                 }
-                'NCentral'{
+                'NCentral' {
                     $Result = Set-NCentralMapping -CIPPMapping $Table -APIName $APIName -Request $Request
                 }
                 'Sherweb' {
@@ -101,7 +105,8 @@ Function Invoke-ExecExtensionMapping {
             }
         }
         $StatusCode = [HttpStatusCode]::OK
-    } catch {
+    }
+    catch {
         $ErrorMessage = Get-CippException -Exception $_
         $Result = "Mapping API failed. $($ErrorMessage.NormalizedError)"
         Write-LogMessage -API $APIName -headers $Headers -message $Result -Sev 'Error' -LogData $ErrorMessage
@@ -129,7 +134,8 @@ Function Invoke-ExecExtensionMapping {
             }
         }
         $StatusCode = [HttpStatusCode]::OK
-    } catch {
+    }
+    catch {
         $ErrorMessage = Get-CippException -Exception $_
         $Result = "Mapping API failed. $($ErrorMessage.NormalizedError)"
         Write-LogMessage -API $APIName -headers $Headers -message $Result -Sev 'Error' -LogData $ErrorMessage
