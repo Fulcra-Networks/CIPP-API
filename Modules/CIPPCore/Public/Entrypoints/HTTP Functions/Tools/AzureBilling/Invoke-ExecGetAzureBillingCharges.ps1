@@ -126,9 +126,9 @@ function Get-NoDataRow {
     param($customer, $subscription, $dateval)
     return @{
         chargeDate        = $dateval
-        customerId        = $customer.XacEndCustomerId
+        customerId        = $customer.Reference
         customer          = $customer.companyName
-        subscriptionId    = $subscription.Reference
+        subscriptionId    = $subscription.license_id
         "Resource Group"  = "NO DATA FROM ARROW"
         price             = 0.0
         cost              = 0.0
