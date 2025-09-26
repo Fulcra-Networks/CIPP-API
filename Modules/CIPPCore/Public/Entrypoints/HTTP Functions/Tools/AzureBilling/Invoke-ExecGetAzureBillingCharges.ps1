@@ -95,7 +95,7 @@ function Invoke-ExecGetAzureBillingCharges {
                 }
                 elseif ($null -eq $conMonth -and $null -ne $sub) {
                     #construct a 'no charges on sub data' object
-                    $datestr = ([DateTime]::ParseExact($request.Query.billMonth, 'yyyyMMdd', $null).ToString('MM/dd/yyyy'))
+                    $datestr = ([DateTime]::ParseExact($request.Query.billMonth, 'yyyyMMdd', $null).ToString('MM/28/yyyy'))
                     $no_data_rows += Get-NoDataRow -customer $cust -subscription $sub -dateval $datestr
                 }
             }
@@ -126,9 +126,9 @@ function Get-NoDataRow {
     param($customer, $subscription, $dateval)
     return @{
         chargeDate        = $dateval
-        customerId        = $customer.customerRef
-        customer          = $customer.name
-        subscriptionId    = $subscription.licenseRef
+        customerId        = $customer.XacEndCustomerId
+        customer          = $customer.companyName
+        subscriptionId    = $subscription.Reference
         "Resource Group"  = "NO DATA FROM ARROW"
         price             = 0.0
         cost              = 0.0
