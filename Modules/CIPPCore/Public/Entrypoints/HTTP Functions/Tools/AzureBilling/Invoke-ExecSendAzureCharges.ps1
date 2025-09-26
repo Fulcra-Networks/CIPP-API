@@ -51,8 +51,9 @@ function Invoke-ExecSendAzureCharges {
 
             if ($charge.appendGroup) { $chargeObj.name = "$($charge.chargeName) - $($charge."Resource Group")" }
 
+            Write-LogMessage -sev Info -API "Azure Billing" -message "$($chargeObj|ConvertTo-Json -Depth 5)"
 
-            New-AutotaskAPIResource -Resource ContractCharges -Body $chargeObj -ParentId $charge.contractId
+            New-AutotaskAPIResource -Resource ContractChargesChild -ParentId $charge.contractId -Body $chargeObj
 
             $sentCharge = @{
                 PartitionKey = $charge.chargeDate.ToString("yyyy-MM-dd") # Get-MappedChargesToSend returns a datetime object.
