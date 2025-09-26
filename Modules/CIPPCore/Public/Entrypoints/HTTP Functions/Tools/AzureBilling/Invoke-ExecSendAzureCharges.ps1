@@ -4,7 +4,7 @@ function Invoke-ExecSendAzureCharges {
     [CmdletBinding()]
     param($Request, $TriggerMetadata)
 
-    $billingDate = (Get-Date 01.01.1970)+([System.TimeSpan]::fromseconds($Request.Body.billMonth))
+    $billingDate = (Get-Date 01.01.1970) + ([System.TimeSpan]::fromseconds($Request.Body.billMonth))
     $billingDate = [DateTime]::New($billingDate.Year, $billingDate.Month, 28)
 
     $CtxExtensionCfg = Get-CIPPTable -TableName Extensionsconfig
@@ -33,23 +33,26 @@ function Invoke-ExecSendAzureCharges {
     $charges = Get-MappedChargesToSend -azMonthSplit $existingData -body $body -atMapping $atMappingRows
 
     $results = @()
-    foreach($charge in $charges){
-        try{
-            $atCharge = New-AutotaskBody -Resource ContractCharges -NoContent
-            if($charge.appendGroup) { $atCharge.name = "$($charge.chargeName) - $($charge."Resource Group")" }
-            else { $atCharge.name = $charge.ChargeName }
-            $atCharge.contractID            = $charge.contractId
-            $atCharge.billingCodeID         = $charge.allocationCodeId
-            $atCharge.isBillableToCompany   = $charge.billableToAccount
-            $atCharge.unitCost              = [decimal]::round($charge.cost,2)
-            $atCharge.unitPrice             = [decimal]::round($charge.price,2)
-            $atCharge.datePurchased         = $charge.chargeDate
-            $atCharge.chargeType            = 1 # Operational
-            $atCharge.status                = 6 # Delivered/Shipped Full
-            $atCharge.unitQuantity          = 1
+    foreach ($charge in $charges) {
+        try {
 
-            New-AutotaskAPIResource -Resource ContractCharges -Body $atCharge
-            $results += $atCharge
+            $chargeObj = [PSCustomObject]@{
+                name                = $charge.ChargeName
+                contractID          = $charge.contractId
+                billingCodeID       = $charge.allocationCodeId
+                isBillableToCompany = $charge.billableToAccount
+                unitCost            = [decimal]::round($charge.cost, 2)
+                unitPrice           = [decimal]::round($charge.price, 2)
+                datePurchased       = $charge.chargeDate.ToString("MM-dd-yyyy")
+                chargeType          = 1 # Operational
+                status              = 6 # Delivered/Shipped Full
+                unitQuantity        = 1
+            }
+
+            if ($charge.appendGroup) { $chargeObj.name = "$($charge.chargeName) - $($charge."Resource Group")" }
+
+
+            New-AutotaskAPIResource -Resource ContractCharges -Body $chargeObj -ParentId $charge.contractId
 
             $sentCharge = @{
                 PartitionKey = $charge.chargeDate.ToString("yyyy-MM-dd") # Get-MappedChargesToSend returns a datetime object.
@@ -61,20 +64,22 @@ function Invoke-ExecSendAzureCharges {
             }
 
             Add-CIPPAzDataTableEntity @SentChargesTable -Entity $sentCharge -Force
+            $results += "Sent charge $($chargeObj.name) - `$$($chargeObj.unitPrice)"
         }
         catch {
             Write-LogMessage -sev Error -API "Azure Billing" -message "Error sending charge: $($_.Exception.Message)"
+            $results += "Error sending charge ($($chargeObj.name)): $($_.Exception.Message)"
         }
     }
 
     Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
             StatusCode = [HttpStatusCode]::OK
-            Body       = "Sent $($results.count) of $($charges.count) charges."
-    })
+            Body       = @($results)
+        })
 }
 
 function Get-BillingData {
-    param($table,$date)
+    param($table, $date)
     $existingData = @()
 
     $Filter = "PartitionKey eq '$($date.ToString("yyyy-MM"))'"
@@ -87,8 +92,8 @@ function Get-MappedChargesToSend {
     param($azMonthSplit, $body, $atMapping)
 
     $atMappingHashTable = @{}
-    $atMapping| ForEach-Object {
-        if([string]::IsNullOrEmpty($_.PartitionKey) -or [string]::IsNullOrEmpty($_.paxResourceGroupName)) {
+    $atMapping | ForEach-Object {
+        if ([string]::IsNullOrEmpty($_.PartitionKey) -or [string]::IsNullOrEmpty($_.paxResourceGroupName)) {
             Write-Host "$('*'*60) Empty PartitionKey or paxResourceGroupName..."
         }
         else {
@@ -102,35 +107,35 @@ function Get-MappedChargesToSend {
     $azMonthSplit | ForEach-Object {
         $join = ("$($_.licenseRef.Trim()) - $($_.group.Trim())").ToUpper()
 
-        if($null -ne $_.PartitionKey){
-            $chargeDate = [DateTime]::ParseExact("$($_.PartitionKey)-28",'yyyy-MM-dd',$null)
+        if ($null -ne $_.PartitionKey) {
+            $chargeDate = [DateTime]::ParseExact("$($_.PartitionKey)-28", 'yyyy-MM-dd', $null)
         }
         else {
             Write-Host "$('*'*60) Bad chargedate value"
             continue
         }
 
-        if($atMappingHashTable.Contains($join)){
+        if ($atMappingHashTable.Contains($join)) {
             $mapping = $atMappingHashTable[$join]
 
             #if($mapping.billableToAccount){
             #}
             $body += @{
-                chargeDate          = $chargeDate
-                customerId          = $_.customerRef
-                customer            = $_.customer
-                subscriptionId      = $_.licenseRef
-                "Resource Group"    = ($_.group.toupper())
-                price               = $_.totalList
-                cost                = $_.totalReseller
-                vendor              = "Arrow" # TODO - Set this via the billing extension config options.
-                atCustId            = $mapping.atCustId
-                allocationCodeId    = $mapping.allocationCodeId
-                chargeName          = $mapping.chargeName
-                appendGroup         = $mapping.appendGroup
-                contractId          = $mapping.contractId
-                billableToAccount   = $mapping.billableToAccount
-                atSumGroup          = $mapping.atSumGroup
+                chargeDate        = $chargeDate
+                customerId        = $_.customerRef
+                customer          = $_.customer
+                subscriptionId    = $_.licenseRef
+                "Resource Group"  = ($_.group.toupper())
+                price             = $_.totalList
+                cost              = $_.totalReseller
+                vendor            = "Arrow" # TODO - Set this via the billing extension config options.
+                atCustId          = $mapping.atCustId
+                allocationCodeId  = $mapping.allocationCodeId
+                chargeName        = $mapping.chargeName
+                appendGroup       = $mapping.appendGroup
+                contractId        = $mapping.contractId
+                billableToAccount = $mapping.billableToAccount
+                atSumGroup        = $mapping.atSumGroup
             }
         }
     }
