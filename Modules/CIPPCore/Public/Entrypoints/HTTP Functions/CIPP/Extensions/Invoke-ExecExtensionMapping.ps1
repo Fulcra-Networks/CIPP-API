@@ -1,5 +1,3 @@
-using namespace System.Net
-
 Function Invoke-ExecExtensionMapping {
     <#
     .FUNCTIONALITY
@@ -10,9 +8,9 @@ Function Invoke-ExecExtensionMapping {
     [CmdletBinding()]
     param($Request, $TriggerMetadata)
 
-    $APIName = $Request.Params.CIPPEndpoint
-    $Headers = $Request.Headers
-    Write-LogMessage -headers $Headers -API $APIName -message 'Accessed this API' -Sev 'Debug'
+  $APIName = $Request.Params.CIPPEndpoint
+  $Headers = $Request.Headers
+
 
     $Table = Get-CIPPTable -TableName CippMapping
 
@@ -113,39 +111,9 @@ Function Invoke-ExecExtensionMapping {
         $StatusCode = [HttpStatusCode]::InternalServerError
     }
 
-    try {
-        if ($Request.Query.AutoMapping) {
-            switch ($Request.Query.AutoMapping) {
-                'NinjaOne' {
-                    $Batch = [PSCustomObject]@{
-                        'NinjaAction'  = 'StartAutoMapping'
-                        'FunctionName' = 'NinjaOneQueue'
-                    }
-                    $InputObject = [PSCustomObject]@{
-                        OrchestratorName = 'NinjaOneOrchestrator'
-                        Batch            = @($Batch)
-                    }
-                    #Write-Host ($InputObject | ConvertTo-Json)
-                    $InstanceId = Start-NewOrchestration -FunctionName 'CIPPOrchestrator' -InputObject ($InputObject | ConvertTo-Json -Depth 5 -Compress)
-                    Write-Host "Started permissions orchestration with ID = '$InstanceId'"
-                    $Result = 'AutoMapping Request has been queued. Exact name matches will appear first and matches on device names and serials will take longer. Please check the CIPP Logbook and refresh the page once complete.'
-                }
-
-            }
-        }
-        $StatusCode = [HttpStatusCode]::OK
-    }
-    catch {
-        $ErrorMessage = Get-CippException -Exception $_
-        $Result = "Mapping API failed. $($ErrorMessage.NormalizedError)"
-        Write-LogMessage -API $APIName -headers $Headers -message $Result -Sev 'Error' -LogData $ErrorMessage
-        $StatusCode = [HttpStatusCode]::InternalServerError
-    }
-
-    # Associate values to output bindings by calling 'Push-OutputBinding'.
-    Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
-            StatusCode = $StatusCode
-            Body       = $Result
-        })
+  return ([HttpResponseContext]@{
+      StatusCode = $StatusCode
+      Body       = $Result
+    })
 
 }
