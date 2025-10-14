@@ -8,8 +8,8 @@ Function Invoke-ExecExtensionMapping {
     [CmdletBinding()]
     param($Request, $TriggerMetadata)
 
-  $APIName = $Request.Params.CIPPEndpoint
-  $Headers = $Request.Headers
+    $APIName = $Request.Params.CIPPEndpoint
+    $Headers = $Request.Headers
 
 
     $Table = Get-CIPPTable -TableName CippMapping
@@ -111,9 +111,9 @@ Function Invoke-ExecExtensionMapping {
         $StatusCode = [HttpStatusCode]::InternalServerError
     }
 
-  return ([HttpResponseContext]@{
-      StatusCode = $StatusCode
-      Body       = $Result
-    })
+    return ([HttpResponseContext]@{
+            StatusCode = $StatusCode
+            Body       = $Result
+        })
 
 }
