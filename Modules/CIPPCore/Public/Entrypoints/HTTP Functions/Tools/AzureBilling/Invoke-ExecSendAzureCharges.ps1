@@ -32,6 +32,7 @@ function Invoke-ExecSendAzureCharges {
     $body = @()
     $charges = Get-MappedChargesToSend -azMonthSplit $existingData -body $body -atMapping $atMappingRows
 
+    $isErrorState = $false
     $results = @()
     foreach ($charge in $charges) {
         try {
@@ -70,13 +71,20 @@ function Invoke-ExecSendAzureCharges {
         catch {
             Write-LogMessage -sev Error -API "Azure Billing" -message "Error sending charge: $($_.Exception.Message)"
             $results += "Error sending charge ($($chargeObj.name)): $($_.Exception.Message)"
+            $isErrorState = $true
         }
     }
 
-    Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
+    $resp = ([HttpResponseContext]@{
             StatusCode = [HttpStatusCode]::OK
             Body       = @($results)
         })
+
+    if ($isErrorState) {
+        $resp.StatusCode = [HttpStatusCode]::UnprocessableEntity
+    }
+
+    Push-OutputBinding -Name Response -Value $resp
 }
 
 function Get-BillingData {

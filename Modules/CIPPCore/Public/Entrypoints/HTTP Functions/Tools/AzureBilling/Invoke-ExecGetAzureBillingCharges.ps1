@@ -61,10 +61,18 @@ function Invoke-ExecGetAzureBillingCharges {
             if ($existingData.count -gt 0) {
                 Write-LogMessage -sev Info -API "Azure Billing" -message "Existing records found and rerun not requested."
                 $mappedUnmapped = Get-MappedUnmappedCharges -azMonthSplit $existingData -body $body -atMapping $atMappingRows
+                $noDataRows = Get-NoApiDataRows -month $request.Query.billMonth
                 $body = $mappedUnmapped.mapped
+                $body += $noDataRows
+
+                $respData = [PSCustomObject]@{
+                    previousMonth = 42069
+                    rows          = @($body)
+                }
+
                 Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
                         StatusCode = [HttpStatusCode]::OK
-                        Body       = $body
+                        Body       = $respData
                     })
                 return
             }
@@ -95,13 +103,14 @@ function Invoke-ExecGetAzureBillingCharges {
                 }
                 elseif ($null -eq $conMonth -and $null -ne $sub) {
                     #construct a 'no charges on sub data' object
-                    $datestr = ([DateTime]::ParseExact($request.Query.billMonth, 'yyyyMMdd', $null).ToString('MM/28/yyyy'))
+                    $datestr = ([DateTime]::ParseExact($request.Query.billMonth, 'yyyyMMdd', $null).ToString('yyyy-MM'))
                     $no_data_rows += Get-NoDataRow -customer $cust -subscription $sub -dateval $datestr
                 }
             }
         }
 
 
+        Write-NoDataRows $no_data_rows
         $data = Get-ExistingBillingData -table $billingContext -date $request.Query.billMonth
         $mappedUnmapped = Get-MappedUnmappedCharges -azMonthSplit $data -body $body -atMapping $atMappingRows
         $body = $mappedUnmapped.mapped
@@ -115,9 +124,14 @@ function Invoke-ExecGetAzureBillingCharges {
         $body = @("Error getting billing data. Details have been logged.")
     }
 
+    $respData = [PSCustomObject]@{
+        previousMonth = 42069
+        rows          = @($body)
+    }
+
     Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
             StatusCode = [HttpStatusCode]::OK
-            Body       = @($body)
+            Body       = $respData
         })
 }
 
@@ -217,6 +231,42 @@ function Get-MappedUnmappedCharges {
     return @{mapped = $body; unmapped = $unmappedCharges }
 }
 
+function Write-NoDataRows {
+    param($charges)
+
+    $noDataContext = Get-CIPPTable -tablename AzureBillingNoDataSubscriptions
+    foreach ($line in $charges) {
+        try {
+            $AddObject = @{
+                PartitionKey      = $line.chargeDate
+                RowKey            = "$($line.subscriptionId) - $($line.customerId)"
+                chargeDate        = $dateval
+                customerId        = $customer.Reference
+                customer          = $customer.companyName
+                subscriptionId    = $subscription.license_id
+                "Resource Group"  = "NO DATA FROM ARROW"
+                price             = 0.0
+                cost              = 0.0
+                vendor            = "Arrow"
+                atCustId          = -1
+                allocationCodeId  = -1
+                chargeName        = "N/A"
+                appendGroup       = $false
+                contractId        = -1
+                billableToAccount = $false
+                atSumGroup        = $false
+            }
+
+            Add-CIPPAzDataTableEntity @noDataContext -Entity $AddObject -Force
+
+            Write-LogMessage -sev Debug -API 'Azure Billing' -message "Added no api data row for $($line.customer)"
+        }
+        catch {
+            Write-LogMessage -sev Error -API 'Azure Billing' -message "Error writing no api data row to table $($_.Exception.Message)"
+        }
+    }
+}
+
 function Write-ChargesToTable {
     param($table, $charges, $rerun)
 
@@ -287,6 +337,15 @@ function Get-ExistingBillingData {
     $existingData = Get-CIPPAzDataTableEntity @table -filter $Filter
 
     return $existingData
+}
+
+function Get-NoApiDataRows {
+    param($month)
+
+    $noDataContext = Get-CIPPTable -tablename AzureBillingNoDataSubscriptions
+
+    $Filter = "PartitionKey eq '$month'"
+    $existingData = Get-CIPPAzDataTableEntity @table -filter $Filter
 }
 
 function GetArrowCustomers {
