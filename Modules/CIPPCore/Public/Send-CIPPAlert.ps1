@@ -30,6 +30,7 @@ function Send-CIPPAlert {
                 }
 
                 if($AdditionalRecipients){
+                    $Recipients = @($Recipients)
                     $AdditionalRecipients | ForEach-Object { if($_ -like '*@*'){$Recipients += [pscustomobject]@{EmailAddress = @{Address = $_ } }} }
                 }
 
