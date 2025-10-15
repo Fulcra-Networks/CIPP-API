@@ -77,7 +77,7 @@ function Get-ATMinuteMinderCheckIn {
             Type                  = 'email'
             Title                 = "CIPP Minute Minder"
             HTMLContent           = $htmlBody
-            $AdditionalRecipients = @($addtnlRecip)
+            AdditionalRecipients = @($addtnlRecip)
         }
         Send-CIPPAlert @CIPPAlert
     }
