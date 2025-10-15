@@ -22,15 +22,18 @@ function Invoke-ExecGDAPInvite {
     if ($Headers.'x-ms-client-principal-idp' -eq 'azureStaticWebApps' -or !$Headers.'x-ms-client-principal-idp') {
         $user = $headers.'x-ms-client-principal'
         $Technician = ([System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($user)) | ConvertFrom-Json).userDetails
-    } elseif ($Headers.'x-ms-client-principal-idp' -eq 'aad') {
+    }
+    elseif ($Headers.'x-ms-client-principal-idp' -eq 'aad') {
         $Table = Get-CIPPTable -TableName 'ApiClients'
         $Client = Get-CIPPAzDataTableEntity @Table -Filter "RowKey eq '$($headers.'x-ms-client-principal-name')'"
         $Technician = $Client.AppName ?? 'CIPP-API'
-    } else {
+    }
+    else {
         try {
             $user = $headers.'x-ms-client-principal'
             $Technician = ([System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($user)) | ConvertFrom-Json).userDetails
-        } catch {
+        }
+        catch {
             $Technician = 'System'
         }
     }
@@ -41,7 +44,8 @@ function Invoke-ExecGDAPInvite {
 
             if ($RoleMappings.roleDefinitionId -contains '62e90394-69f5-4237-9190-012177145e10') {
                 $AutoExtendDuration = 'PT0S'
-            } else {
+            }
+            else {
                 $AutoExtendDuration = 'P180D'
             }
 
@@ -83,7 +87,8 @@ function Invoke-ExecGDAPInvite {
                         try {
                             $Uri = ([System.Uri]$TriggerMetadata.Headers.Referer)
                             $OnboardingUrl = $Uri.AbsoluteUri.Replace($Uri.PathAndQuery, "/tenant/gdap-management/onboarding/start?id=$($NewRelationship.id)")
-                        } catch {
+                        }
+                        catch {
                             $OnboardingUrl = $null
                         }
 
@@ -96,24 +101,27 @@ function Invoke-ExecGDAPInvite {
                             'Technician'    = [string]$Technician
                         }
 
-                        if ($Reference) { $InviteEntity['Reference'] = [string]$Reference }
+                        if ($Reference) { $InviteEntity | Add-Member -MemberType NoteProperty -Name Reference -Value [string]$Reference }
 
                         Add-CIPPAzDataTableEntity @Table -Entity $InviteEntity
 
                         $Message = 'GDAP relationship invite created. Log in as a Global Admin in the new tenant to approve the invite.'
-                    } else {
+                    }
+                    else {
                         $Message = 'Error creating GDAP relationship request'
                     }
 
                     Write-LogMessage -headers $Request.Headers -API $APINAME -message "Created GDAP Invite - $InviteUrl" -Sev 'Info'
                 }
-            } catch {
+            }
+            catch {
                 $Message = 'Error creating GDAP relationship, failed at step: ' + $Step
                 Write-Host "GDAP ERROR: $($_.InvocationInfo.PositionMessage)"
 
                 if ($Step -eq 'Creating GDAP relationship' -and $_.Exception.Message -match 'The user (principal) does not have the required permissions to perform the specified action on the resource.') {
                     $Message = 'Error creating GDAP relationship, ensure that all users have MFA enabled and enforced without exception. Please see the Microsoft Partner Security Requirements documentation for more information. https://learn.microsoft.com/en-us/partner-center/security/partner-security-requirements'
-                } else {
+                }
+                else {
                     $Message = "$($Message): $($_.Exception.Message)"
                 }
 
@@ -139,7 +147,8 @@ function Invoke-ExecGDAPInvite {
 
                 Add-CIPPAzDataTableEntity @Table -Entity $InviteEntity -OperationType 'UpsertMerge'
                 $Message = 'Invite updated'
-            } else {
+            }
+            else {
                 $Message = 'Invite not found'
             }
             $body = @{
@@ -151,7 +160,8 @@ function Invoke-ExecGDAPInvite {
             if ($Invite) {
                 Remove-AzDataTableEntity @Table -Entity $Invite
                 $Message = 'Invite deleted'
-            } else {
+            }
+            else {
                 $Message = 'Invite not found'
             }
             $body = @{
