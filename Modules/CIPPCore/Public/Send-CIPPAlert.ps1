@@ -28,6 +28,11 @@ function Send-CIPPAlert {
                 } else {
                     $Config.email.split($(if ($Config.email -like '*,*') { ',' } else { ';' })).trim() | ForEach-Object { if ($_ -like '*@*') { [pscustomobject]@{EmailAddress = @{Address = $_ } } } }
                 }
+
+                if($AdditionalRecipients){
+                    $AdditionalRecipients | ForEach-Object { if($_ -like '*@*'){$Recipients += [pscustomobject]@{EmailAddress = @{Address = $_ } }} }
+                }
+
                 $PowerShellBody = [PSCustomObject]@{
                     message         = @{
                         subject      = $Title

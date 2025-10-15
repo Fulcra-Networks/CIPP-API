@@ -74,10 +74,10 @@ function Get-ATMinuteMinderCheckIn {
         $htmlbody += "</table><br/><br/>This check reviews the previous 14 days for days where total combined time entries are less than 7 hours.</p>"
 
         $CIPPAlert = @{
-            Type        = 'email'
-            Title       = "CIPP Minute Minder"
-            HTMLContent = $htmlBody
-            altEmail    = @($addtnlRecip)
+            Type                  = 'email'
+            Title                 = "CIPP Minute Minder"
+            HTMLContent           = $htmlBody
+            $AdditionalRecipients = @($addtnlRecip)
         }
         Send-CIPPAlert @CIPPAlert
     }
