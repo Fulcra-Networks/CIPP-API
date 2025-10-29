@@ -8,11 +8,10 @@ function Invoke-ExecGetAzureBillingCharges {
 
     if ([String]::IsNullOrEmpty($request.Query.billMonth)) {
         $body = @("No date set")
-        Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
+        return ([HttpResponseContext]@{
                 StatusCode = [HttpStatusCode]::BadRequest
                 Body       = $body
             })
-        return  # Short-circuit the function
     }
 
     $CtxExtensionCfg = Get-CIPPTable -TableName Extensionsconfig
@@ -20,11 +19,10 @@ function Invoke-ExecGetAzureBillingCharges {
 
     if (-not $CfgExtensionTbl.AzureBilling) {
         $body = @("Extension is not configured")
-        Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
+        return ([HttpResponseContext]@{
                 StatusCode = [HttpStatusCode]::BadRequest
                 Body       = @($body)
             })
-        return  # Short-circuit the function
     }
 
     $SCRIPT:baseURI = $CfgExtensionTbl.AzureBilling.APIHost
@@ -33,11 +31,10 @@ function Invoke-ExecGetAzureBillingCharges {
 
     if (-not $hdrAuth) {
         $body = @("Could not get authentication data")
-        Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
+        return ([HttpResponseContext]@{
                 StatusCode = [HttpStatusCode]::BadRequest
                 Body       = @($body)
             })
-        return  # Short-circuit the function
     }
 
     try {
@@ -54,6 +51,8 @@ function Invoke-ExecGetAzureBillingCharges {
             Write-LogMessage -sev Info -API "Azure Billing" -message "Rerun billing job requested. $($Request.Query.rerunJob)"
         }
 
+        $prevMonth = Get-PreviousMonthSentAmount -monthFilter $Request.Query.billMonth
+
         $body = @()
 
         if ([bool]::Parse($request.Query.rerunJob) -eq $false) {
@@ -63,18 +62,19 @@ function Invoke-ExecGetAzureBillingCharges {
                 $mappedUnmapped = Get-MappedUnmappedCharges -azMonthSplit $existingData -body $body -atMapping $atMappingRows
                 $noDataRows = Get-NoApiDataRows -month $request.Query.billMonth
                 $body = $mappedUnmapped.mapped
-                $body += $noDataRows
+                if ($null -ne $noDataRows) {
+                    $body += $noDataRows
+                }
 
                 $respData = [PSCustomObject]@{
-                    previousMonth = 42069
+                    previousMonth = $prevMonth
                     rows          = @($body)
                 }
 
-                Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
+                return ([HttpResponseContext]@{
                         StatusCode = [HttpStatusCode]::OK
                         Body       = $respData
                     })
-                return
             }
         }
 
@@ -114,22 +114,23 @@ function Invoke-ExecGetAzureBillingCharges {
         $data = Get-ExistingBillingData -table $billingContext -date $request.Query.billMonth
         $mappedUnmapped = Get-MappedUnmappedCharges -azMonthSplit $data -body $body -atMapping $atMappingRows
         $body = $mappedUnmapped.mapped
-        $body += $no_data_rows #This is to show which subscriptions returned no data.
-
+        if ($null -ne $no_data_rows) {
+            $body += $no_data_rows #This is to show which subscriptions returned no data.
+        }
 
         Write-UnmappedToTable -table $atUnmappedContext -unmappedcharges $mappedUnmapped.unmapped
     }
     catch {
-        Write-LogMessage -sev Error -API 'Azure Billing' -message "$($_.Exception.Message)"
+        Write-LogMessage -sev Error -API 'Azure Billing' -message "Invoke-ExecGetAzureBillingCharges error: $($_.Exception.Message)"
         $body = @("Error getting billing data. Details have been logged.")
     }
 
     $respData = [PSCustomObject]@{
-        previousMonth = 42069
+        previousMonth = $prevMonth
         rows          = @($body)
     }
 
-    Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
+    return ([HttpResponseContext]@{
             StatusCode = [HttpStatusCode]::OK
             Body       = $respData
         })
@@ -160,7 +161,6 @@ function Get-NoDataRow {
 
 function Get-MappedUnmappedCharges {
     param($azMonthSplit, $body, $atMapping)
-
 
     $unmappedCharges = @()
 
@@ -240,10 +240,10 @@ function Write-NoDataRows {
             $AddObject = @{
                 PartitionKey      = $line.chargeDate
                 RowKey            = "$($line.subscriptionId) - $($line.customerId)"
+                subscriptionId    = $line.subscriptionId
                 chargeDate        = $dateval
-                customerId        = $customer.Reference
-                customer          = $customer.companyName
-                subscriptionId    = $subscription.license_id
+                customerId        = $line.customerId
+                customer          = $line.customer
                 "Resource Group"  = "NO DATA FROM ARROW"
                 price             = 0.0
                 cost              = 0.0
@@ -331,21 +331,58 @@ function Write-UnmappedToTable {
 
 function Get-ExistingBillingData {
     param($table, $date)
-    $existingData = @()
+    try {
+        $existingData = @()
 
-    $Filter = "PartitionKey eq '$([DateTime]::ParseExact($date,'yyyyMMdd',$null).ToString('yyyy-MM'))'"
-    $existingData = Get-CIPPAzDataTableEntity @table -filter $Filter
+        $Filter = "PartitionKey eq '$([DateTime]::ParseExact($date,'yyyyMMdd',$null).ToString('yyyy-MM'))'"
+        $existingData = Get-CIPPAzDataTableEntity @table -filter $Filter
 
-    return $existingData
+        return $existingData
+    }
+    catch {
+        Write-LogMessage -sev Error -API 'Azure Billing' -message "Error getting existing billing data: $($_.Exception.Message)"
+        return $null
+    }
 }
 
 function Get-NoApiDataRows {
     param($month)
+    try {
+        $noDataContext = Get-CIPPTable -tablename AzureBillingNoDataSubscriptions
 
-    $noDataContext = Get-CIPPTable -tablename AzureBillingNoDataSubscriptions
+        $monthFilter = ([DateTime]::ParseExact($request.Query.billMonth, 'yyyyMMdd', $null).ToString('yyyy-MM'))
+        $Filter = "PartitionKey eq '$monthFilter'"
+        $existingData = Get-CIPPAzDataTableEntity @noDataContext -filter $Filter
 
-    $Filter = "PartitionKey eq '$month'"
-    $existingData = Get-CIPPAzDataTableEntity @table -filter $Filter
+        Write-Host "$('*'*60)$monthFilter, $Filter,  $($existingdata|convertto-json -depth 10)"
+
+        $noDataRows = @()
+        $existingData | ForEach-Object {
+            $noDataRows += @{
+                chargeDate        = $_.PartitionKey
+                customerId        = $_.customerId
+                customer          = $_.customer
+                subscriptionId    = $_.subscriptionId
+                "Resource Group"  = "NO DATA FROM ARROW"
+                price             = 0.0
+                cost              = 0.0
+                vendor            = "Arrow"
+                atCustId          = -1
+                allocationCodeId  = -1
+                chargeName        = "N/A"
+                appendGroup       = $false
+                contractId        = -1
+                billableToAccount = $false
+                atSumGroup        = $false
+            }
+        }
+
+        return $noDataRows
+    }
+    catch {
+        Write-LogMessage -sev Error -API 'Azure Billing' -message "Error getting no-apidata rows: $($_.Exception.Message)"
+        return $null
+    }
 }
 
 function GetArrowCustomers {
@@ -460,6 +497,34 @@ function GetAzureConsumptionMonthSplit {
     catch {
         Write-LogMessage -sev Error -API 'Azure Billing' -message "Error in GetAzureConsumptionMonthSplit: $($_.Exception.Message)"
         return $null
+    }
+}
+
+function Get-PreviousMonthSentAmount {
+    param($monthFilter)
+
+    $sentAmount = 0.00
+
+    try {
+        #This takes the month filter passed by the UI and reduces the months by 1 and formats it for the partition key for the "AzureBillingChargesSent" table.
+        $monthFilter = ([DateTime]::ParseExact($request.Query.billMonth, 'yyyyMMdd', $null).AddMonths(-1).ToString('yyyy-MM-28'))
+
+        $table = Get-CIPPTable -tablename AzureBillingChargesSent
+
+
+        $sentFilter = "PartitionKey eq '$monthFilter'"
+        $sentData = Get-CIPPAzDataTableEntity @table -filter $sentFilter
+
+        if ($null -eq $sentData) {
+            return $sentAmount;
+        }
+
+        $sentAmount = (($sentData | Measure-Object -Property price -Sum).Sum).ToString("0.00")
+        return $sentAmount
+    }
+    catch {
+        Write-LogMessage -sev Error -API 'Azure Billing' -message "Error in Get-PreviousMonthSentAmount: $($_.Exception.Message)"
+        return $sentAmount;
     }
 }
 
