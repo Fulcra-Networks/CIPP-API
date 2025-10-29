@@ -33,7 +33,6 @@ function Invoke-ExecCommunityRepo {
                 StatusCode = [HttpStatusCode]::OK
                 Body       = $Body
             })
-        return
     }
 
     $Table = Get-CIPPTable -TableName CommunityRepos

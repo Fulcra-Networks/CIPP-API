@@ -6,7 +6,7 @@ function Invoke-ListPSABillingCodes {
 
     $billingCodes = Get-AutotaskBillingCodes
 
-    Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
+    return ([HttpResponseContext]@{
         StatusCode = [HttpStatusCode]::OK
         Body = @($billingCodes)
     })

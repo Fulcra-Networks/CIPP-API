@@ -84,7 +84,7 @@ function Invoke-ExecSendAzureCharges {
         $resp.StatusCode = [HttpStatusCode]::UnprocessableEntity
     }
 
-    Push-OutputBinding -Name Response -Value $resp
+    return $resp
 }
 
 function Get-BillingData {

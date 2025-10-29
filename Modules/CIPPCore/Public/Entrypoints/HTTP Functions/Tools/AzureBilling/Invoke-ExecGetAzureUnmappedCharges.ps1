@@ -7,11 +7,10 @@ function Invoke-ExecGetAzureUnmappedCharges {
 
     if ([String]::IsNullOrEmpty($request.Query.billMonth)) {
         $body = @("No date set")
-        Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
+        return ([HttpResponseContext]@{
             StatusCode = [HttpStatusCode]::BadRequest
             Body       = $body
         })
-        return  # Short-circuit the function
     }
 
     try{
@@ -36,7 +35,7 @@ function Invoke-ExecGetAzureUnmappedCharges {
             }
         }
 
-        Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
+        return ([HttpResponseContext]@{
             StatusCode = [HttpStatusCode]::OK
             Body       = @($body)
         })
@@ -44,7 +43,7 @@ function Invoke-ExecGetAzureUnmappedCharges {
     catch {
         Write-LogMessage -sev Error -API 'Azure Billing' -message "$($_.Exception.Message)"
         $body = @("Error getting billing data. Details have been logged.")
-        Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
+        return ([HttpResponseContext]@{
             StatusCode = [HttpStatusCode]::OK
             Body       = $body
         })

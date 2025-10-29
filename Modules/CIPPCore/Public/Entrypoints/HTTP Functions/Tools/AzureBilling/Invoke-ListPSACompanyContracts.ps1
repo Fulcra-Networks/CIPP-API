@@ -11,7 +11,7 @@ function Invoke-ListPSACompanyContracts {
         $contracts = @(@{id=-1;contractName='No company ID selected'})
     }
 
-    Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
+    return ([HttpResponseContext]@{
         StatusCode = [HttpStatusCode]::OK
         Body = @($contracts)
     })

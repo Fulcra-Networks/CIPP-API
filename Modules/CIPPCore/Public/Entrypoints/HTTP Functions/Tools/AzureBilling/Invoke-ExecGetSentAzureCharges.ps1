@@ -35,7 +35,7 @@ function Invoke-ExecGetSentAzureCharges {
 
     #write-host "$('*'*60) $($resp|ConvertTo-Json -Depth 10)"
 
-    Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
+    return ([HttpResponseContext]@{
         StatusCode = [HttpStatusCode]::OK
         Body       = @($resp)
     })

@@ -64,14 +64,14 @@ Function Invoke-ExecAssetManagement {
             }
         }
 
-        Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
+        return ([HttpResponseContext]@{
             StatusCode = [HttpStatusCode]::OK
             Body       = $body
         })
     }
     catch{
         Write-LogMessage -sev Error -API "ExecAssetManagement" -message "Error getting asset management data. $($_.Exception.Message)"
-        Push-OutputBinding -Name Response -Value ([HttpResponseContext]@{
+        return ([HttpResponseContext]@{
             StatusCode = [HttpStatusCode]::InternalServerError
             Body       = $body
         })
