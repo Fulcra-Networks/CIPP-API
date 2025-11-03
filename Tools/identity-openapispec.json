@@ -124,7 +124,9 @@
                     "description": "User Principal Name"
                   }
                 },
-                "required": ["ID"]
+                "required": [
+                  "ID"
+                ]
               }
             }
           }
@@ -152,7 +154,9 @@
                     "description": "User Principal Name"
                   }
                 },
-                "required": ["ID"]
+                "required": [
+                  "ID"
+                ]
               }
             }
           }
@@ -180,7 +184,9 @@
                     "description": "User Principal Name"
                   }
                 },
-                "required": ["UserEmail"]
+                "required": [
+                  "UserEmail"
+                ]
               }
             }
           }
@@ -209,11 +215,18 @@
                   },
                   "State": {
                     "type": "string",
-                    "enum": ["Enforced", "Enabled", "Disabled"],
+                    "enum": [
+                      "Enforced",
+                      "Enabled",
+                      "Disabled"
+                    ],
                     "description": "MFA State"
                   }
                 },
-                "required": ["userId", "State"]
+                "required": [
+                  "userId",
+                  "State"
+                ]
               }
             }
           }
@@ -242,11 +255,17 @@
                   },
                   "MailboxType": {
                     "type": "string",
-                    "enum": ["!Shared", "!Regular"],
+                    "enum": [
+                      "!Shared",
+                      "!Regular"
+                    ],
                     "description": "Mailbox Type"
                   }
                 },
-                "required": ["ID", "MailboxType"]
+                "required": [
+                  "ID",
+                  "MailboxType"
+                ]
               }
             }
           }
@@ -274,7 +293,9 @@
                     "description": "User Principal Name"
                   }
                 },
-                "required": ["ID"]
+                "required": [
+                  "ID"
+                ]
               }
             }
           }
@@ -303,7 +324,10 @@
                   },
                   "AutoReplyState": {
                     "type": "string",
-                    "enum": ["Enabled", "Disabled"],
+                    "enum": [
+                      "Enabled",
+                      "Disabled"
+                    ],
                     "description": "Auto Reply State"
                   },
                   "input": {
@@ -311,7 +335,10 @@
                     "description": "Out of Office Message"
                   }
                 },
-                "required": ["userId", "AutoReplyState"]
+                "required": [
+                  "userId",
+                  "AutoReplyState"
+                ]
               }
             }
           }
@@ -373,13 +400,12 @@
                   "addMember": {
                     "type": "string",
                     "description": "Single member to add"
-                  },
-                  "groupId": {
-                    "type": "string",
-                    "description": "Group ID to add member to"
                   }
                 },
-                "required": ["tenantId", "groupId"]
+                "required": [
+                  "tenantId",
+                  "groupId"
+                ]
               }
             }
           }
@@ -484,7 +510,11 @@
                     "description": "Forward Option"
                   }
                 },
-                "required": ["username", "userid", "ForwardOption"]
+                "required": [
+                  "username",
+                  "userid",
+                  "ForwardOption"
+                ]
               }
             }
           }
@@ -512,7 +542,9 @@
                     "description": "User Principal Name"
                   }
                 },
-                "required": ["UserPrincipalName"]
+                "required": [
+                  "UserPrincipalName"
+                ]
               }
             }
           }
@@ -548,7 +580,11 @@
                     "description": "SharePoint Site URL"
                   }
                 },
-                "required": ["username", "userid", "siteUrl"]
+                "required": [
+                  "username",
+                  "userid",
+                  "siteUrl"
+                ]
               }
             }
           }
@@ -624,7 +660,9 @@
                     "description": "Whether to enable the user"
                   }
                 },
-                "required": ["ID"]
+                "required": [
+                  "ID"
+                ]
               }
             }
           }
@@ -660,7 +698,10 @@
                     "description": "User Display Name"
                   }
                 },
-                "required": ["MustChange", "ID"]
+                "required": [
+                  "MustChange",
+                  "ID"
+                ]
               }
             }
           }
@@ -688,7 +729,9 @@
                     "description": "User ID"
                   }
                 },
-                "required": ["ID"]
+                "required": [
+                  "ID"
+                ]
               }
             }
           }
@@ -720,7 +763,10 @@
                     "description": "User Principal Name"
                   }
                 },
-                "required": ["ID", "Username"]
+                "required": [
+                  "ID",
+                  "Username"
+                ]
               }
             }
           }
@@ -748,7 +794,9 @@
                     "description": "User ID"
                   }
                 },
-                "required": ["ID"]
+                "required": [
+                  "ID"
+                ]
               }
             }
           }
@@ -812,7 +860,13 @@
                     "description": "Usage Location"
                   }
                 },
-                "required": ["tenantFilter", "givenName", "surname", "mailNickname", "primDomain"]
+                "required": [
+                  "tenantFilter",
+                  "givenName",
+                  "surname",
+                  "mailNickname",
+                  "primDomain"
+                ]
               }
             }
           }
@@ -1077,7 +1131,11 @@
                     "description": "Whether to hide from GAL"
                   }
                 },
-                "required": ["ID", "GroupType", "HidefromGAL"]
+                "required": [
+                  "ID",
+                  "GroupType",
+                  "HidefromGAL"
+                ]
               }
             }
           }
@@ -1113,7 +1171,11 @@
                     "description": "Whether to only allow internal messages"
                   }
                 },
-                "required": ["ID", "GroupType", "OnlyAllowInternal"]
+                "required": [
+                  "ID",
+                  "GroupType",
+                  "OnlyAllowInternal"
+                ]
               }
             }
           }
@@ -1149,7 +1211,11 @@
                     "description": "Group Display Name"
                   }
                 },
-                "required": ["ID", "GroupType", "DisplayName"]
+                "required": [
+                  "ID",
+                  "GroupType",
+                  "DisplayName"
+                ]
               }
             }
           }
@@ -1185,7 +1251,11 @@
                     "description": "Group Type"
                   }
                 },
-                "required": ["tenantFilter", "groupName", "groupType"]
+                "required": [
+                  "tenantFilter",
+                  "groupName",
+                  "groupType"
+                ]
               }
             }
           }
@@ -1252,7 +1322,10 @@
                     "description": "User Display Name"
                   }
                 },
-                "required": ["userId", "userDisplayName"]
+                "required": [
+                  "userId",
+                  "userDisplayName"
+                ]
               }
             }
           }
@@ -1281,7 +1354,10 @@
                   },
                   "userAction": {
                     "type": "string",
-                    "enum": ["create", "select"],
+                    "enum": [
+                      "create",
+                      "select"
+                    ],
                     "description": "User Action"
                   },
                   "firstName": {
@@ -1327,19 +1403,33 @@
                   },
                   "expireAction": {
                     "type": "string",
-                    "enum": ["DeleteUser", "DisableUser", "RemoveRoles"],
+                    "enum": [
+                      "DeleteUser",
+                      "DisableUser",
+                      "RemoveRoles"
+                    ],
                     "description": "Expiration Action"
                   },
                   "postExecution": {
                     "type": "array",
                     "items": {
                       "type": "string",
-                      "enum": ["Webhook", "email", "PSA"]
+                      "enum": [
+                        "Webhook",
+                        "email",
+                        "PSA"
+                      ]
                     },
                     "description": "Notification Action"
                   }
                 },
-                "required": ["tenantFilter", "userAction", "startDate", "endDate", "adminRoles"]
+                "required": [
+                  "tenantFilter",
+                  "userAction",
+                  "startDate",
+                  "endDate",
+                  "adminRoles"
+                ]
               }
             }
           }
@@ -1360,7 +1450,9 @@
             "description": "Action to perform",
             "schema": {
               "type": "string",
-              "enum": ["List"]
+              "enum": [
+                "List"
+              ]
             }
           }
         ],
@@ -1403,11 +1495,65 @@
                   },
                   "action": {
                     "type": "string",
-                    "enum": ["!Enable", "!Disable", "!Delete"],
+                    "enum": [
+                      "!Enable",
+                      "!Disable",
+                      "!Delete"
+                    ],
                     "description": "Action to perform"
                   }
                 },
-                "required": ["ID", "action"]
+                "required": [
+                  "ID",
+                  "action"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        }
+      }
+    },
+    "/api/ExecDeviceGroupUpdate": {
+      "post": {
+        "summary": "Manage Device",
+        "description": "Add or remove group from device",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "AddMember": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Members to add"
+                  },
+                  "action": {
+                    "type": "string",
+                    "enum": [
+                      "!Add",
+                      "!Remove"
+                    ],
+                    "description": "Action to perform"
+                  },
+                  "groupId": {
+                    "type": "string",
+                    "description": "Group to add to or remove from"
+                  }
+                },
+                "required": [
+                  "AddMember",
+                  "action",
+                  "groupId"
+                ]
               }
             }
           }
@@ -1435,7 +1581,9 @@
                     "description": "Device ID"
                   }
                 },
-                "required": ["GUID"]
+                "required": [
+                  "GUID"
+                ]
               }
             }
           }
@@ -1501,7 +1649,9 @@
                     "description": "Object ID"
                   }
                 },
-                "required": ["ID"]
+                "required": [
+                  "ID"
+                ]
               }
             }
           }
@@ -1545,7 +1695,10 @@
                     "description": "Scheduled offboarding"
                   }
                 },
-                "required": ["tenantFilter", "user"]
+                "required": [
+                  "tenantFilter",
+                  "user"
+                ]
               }
             }
           }
@@ -1598,7 +1751,9 @@
                 "properties": {
                   "Action": {
                     "type": "string",
-                    "enum": ["UploadTemplate"],
+                    "enum": [
+                      "UploadTemplate"
+                    ],
                     "description": "Action to perform"
                   },
                   "GUID": {
@@ -1614,7 +1769,12 @@
                     "description": "Commit Message"
                   }
                 },
-                "required": ["Action", "GUID", "FullName", "Message"]
+                "required": [
+                  "Action",
+                  "GUID",
+                  "FullName",
+                  "Message"
+                ]
               }
             }
           }
@@ -1683,7 +1843,9 @@
                     "description": "Template GUID"
                   }
                 },
-                "required": ["ID"]
+                "required": [
+                  "ID"
+                ]
               }
             }
           }
@@ -1758,7 +1920,11 @@
                     "description": "Group Type"
                   }
                 },
-                "required": ["Displayname", "Description", "groupType"]
+                "required": [
+                  "Displayname",
+                  "Description",
+                  "groupType"
+                ]
               }
             }
           }
