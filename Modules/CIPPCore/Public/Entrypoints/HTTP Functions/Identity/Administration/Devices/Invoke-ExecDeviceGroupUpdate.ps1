@@ -1,26 +1,26 @@
 function Invoke-ExecDeviceGroupUpdate {
     param($Request, $TriggerMetadata)
 
-    <#
+    <# Expected JSON
     {
     "tenantFilter": "ahg-group.com",
     "action": "!Add"
     "addMember": [
         {
-            "label": "DESKTOP-N01BP4E",
+            "label": "SomePCName",
             "addedFields": {
-                "deviceid": "207436d7-d58b-4118-8283-b54d396a8d43"
+                "deviceid": "00000000-0000-0000-0000-000000000000"
             },
-            "value": "3bf6b121-90b6-44d7-81a9-44222b140a59"
+            "value": "00000000-0000-0000-0000-000000000000"
         }
     ],
     "groupId": {
-        "label": "ManagedPCs-BLOCK",
+        "label": "GroupName",
         "addedFields": {
-            "groupName": "ManagedPCs-BLOCK",
+            "groupName": "GroupName",
             "groupType": "Security"
         },
-        "value": "a924858f-891e-40c4-8293-420fff0e56b1"
+        "value": "00000000-0000-0000-0000-000000000000"
     }
     }
     #>
@@ -29,7 +29,6 @@ function Invoke-ExecDeviceGroupUpdate {
     $Action = $Request.Body.action
     $GroupID = $Request.Body.groupId.value
 
-    #Write-Host "$('~'*60) $($Request.Body|ConvertTo-Json -Depth 10)"
     if ($Action -eq '!Add') {
         #https://learn.microsoft.com/en-us/graph/api/group-post-members?view=graph-rest-beta&tabs=http
 
@@ -56,7 +55,7 @@ function Invoke-ExecDeviceGroupUpdate {
             })
         }
 
-        #DELETE https://graph.microsoft.com/beta/groups/{group-id}/members/{directory-object-id}/$ref
+        #https://learn.microsoft.com/en-us/graph/api/group-delete-members?view=graph-rest-beta&tabs=http
         $DeviceID = $Request.Body.addMember[0].value
         $url = "https://graph.microsoft.com/beta/groups/$GroupId/members/$DeviceID/`$ref"
         $Result = New-GraphPOSTRequest -uri $Url -type DELETE -tenantid $TenantFilter -body ''
