@@ -48,7 +48,7 @@ function Invoke-ExecDeviceGroupUpdate {
         }
     }
     elseif ($Action -eq '!Remove') {
-        if($Request.Body.addMember.lenth -ne 1){
+        if($Request.Body.addMember.length -ne 1){
             return ([HttpResponseContext]@{
                 StatusCode = [System.Net.HttpStatusCode]::BadRequest
                 Body       = @{'Results' = "Device ID missing from request." }
