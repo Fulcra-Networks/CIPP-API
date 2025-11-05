@@ -33,32 +33,39 @@ function Invoke-ExecDeviceGroupUpdate {
     if ($Action -eq '!Add') {
         #https://learn.microsoft.com/en-us/graph/api/group-post-members?view=graph-rest-beta&tabs=http
 
-        if($Request.Body.addMember.Count -gt 1){
-            $members = $Request.Body.addMember|ForEach-Object {
+        if ($Request.Body.addMember.Count -gt 1) {
+            $members = $Request.Body.addMember | ForEach-Object {
                 "https://graph.microsoft.com/beta/devices/$($_.value)"
             }
             $url = "https://graph.microsoft.com/beta/groups/$($GroupID)"
-            $ActionBody=@{"members@odata.bind" = $members}|ConvertTo-Json -Depth 10 -Compress
+            $ActionBody = @{"members@odata.bind" = $members } | ConvertTo-Json -Depth 10 -Compress
             Write-Host "$('~'*60) $ActionBody"
             $Result = New-GraphPOSTRequest -uri $Url -type PATCH -tenantid $TenantFilter -body $ActionBody
         }
-        else{
+        else {
             $url = "https://graph.microsoft.com/beta/groups/$groupId/members/`$ref"
             $ActionBody = @{ '@odata.id' = "https://graph.microsoft.com/v1.0/devices/$($Request.Body.addMember[0].Value)" } | ConvertTo-Json -Compress
-            Write-Host "$('~'*60) $ActionBody"
             $Result = New-GraphPOSTRequest -uri $Url -type POST -tenantid $TenantFilter -body $ActionBody
         }
     }
     elseif ($Action -eq '!Remove') {
-         #DELETE https://graph.microsoft.com/beta/groups/{group-id}/members/{directory-object-id}/$ref
+        if($Request.Body.addMember.lenth -ne 1){
+            return ([HttpResponseContext]@{
+                StatusCode = [System.Net.HttpStatusCode]::BadRequest
+                Body       = @{'Results' = "Device ID missing from request." }
+            })
+        }
+
+        #DELETE https://graph.microsoft.com/beta/groups/{group-id}/members/{directory-object-id}/$ref
+        $DeviceID = $Request.Body.addMember[0].value
         $url = "https://graph.microsoft.com/beta/groups/$GroupId/members/$DeviceID/`$ref"
         $Result = New-GraphPOSTRequest -uri $Url -type DELETE -tenantid $TenantFilter -body ''
     }
     else {
         return ([HttpResponseContext]@{
-            StatusCode = $StatusCode
-            Body = @{'Results' = $Result}
-        })
+                StatusCode = [System.Net.HttpStatusCode]::BadRequest
+                Body       = @{'Results' = "$($Request.body.action) is not allowed." }
+            })
     }
 
     return ([HttpResponseContext]@{
