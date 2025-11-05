@@ -241,7 +241,7 @@ function Write-NoDataRows {
                 PartitionKey      = $line.chargeDate
                 RowKey            = "$($line.subscriptionId) - $($line.customerId)"
                 subscriptionId    = $line.subscriptionId
-                chargeDate        = $dateval
+                chargeDate        = $line.chargeDate
                 customerId        = $line.customerId
                 customer          = $line.customer
                 "Resource Group"  = "NO DATA FROM ARROW"
@@ -262,7 +262,7 @@ function Write-NoDataRows {
             Write-LogMessage -sev Debug -API 'Azure Billing' -message "Added no api data row for $($line.customer)"
         }
         catch {
-            Write-LogMessage -sev Error -API 'Azure Billing' -message "Error writing no api data row to table $($_.Exception.Message)"
+            Write-LogMessage -sev Error -API 'Azure Billing' -message "Error writing no api data row to table $($_.Exception.Message) - AddObject JSON: $($AddObject|ConvertTo-JSON -Depth 10 -compress)"
         }
     }
 }
