@@ -17,3 +17,6 @@ SendNotifications/config.json
 
 # Cursor IDE
 .cursor/rules
+
+# AI
+CLAUDE.md
