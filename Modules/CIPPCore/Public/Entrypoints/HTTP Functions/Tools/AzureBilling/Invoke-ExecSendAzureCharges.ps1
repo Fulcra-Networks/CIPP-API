@@ -34,7 +34,9 @@ function Invoke-ExecSendAzureCharges {
 
     $isErrorState = $false
     $results = @()
+    $testVal = 0
     foreach ($charge in $charges) {
+
         try {
 
             $chargeObj = [PSCustomObject]@{
@@ -54,7 +56,6 @@ function Invoke-ExecSendAzureCharges {
 
             Write-LogMessage -sev Info -API "Azure Billing" -message "$($chargeObj|ConvertTo-Json -Depth 5)"
 
-            New-AutotaskAPIResource -Resource ContractChargesChild -ParentId $charge.contractId -Body $chargeObj
 
             $sentCharge = @{
                 PartitionKey = $charge.chargeDate.ToString("yyyy-MM-dd") # Get-MappedChargesToSend returns a datetime object.
@@ -65,14 +66,17 @@ function Invoke-ExecSendAzureCharges {
                 price        = $charge.price
             }
 
-            Add-CIPPAzDataTableEntity @SentChargesTable -Entity $sentCharge -Force
-            $results += "Sent charge $($chargeObj.name) - `$$($chargeObj.unitPrice)"
+            Add-CIPPAzDataTableEntity @SentChargesTable -Entity $sentCharge
+
+            New-AutotaskAPIResource -Resource ContractChargesChild -ParentId $charge.contractId -Body $chargeObj
+            $results += @{"resultText" = "Sent charge $($chargeObj.name) - `$$($chargeObj.unitPrice)"; "state" = "success" }
         }
         catch {
             Write-LogMessage -sev Error -API "Azure Billing" -message "Error sending charge: $($_.Exception.Message)"
-            $results += "Error sending charge ($($chargeObj.name)): $($_.Exception.Message)"
+            $results += @{"resultText" = "Error sending charge ($($chargeObj.name)): $($_.Exception.Message)"; "state" = "error" }
             $isErrorState = $true
         }
+        $testVal += 1
     }
 
     $resp = ([HttpResponseContext]@{
