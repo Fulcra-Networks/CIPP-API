@@ -41,14 +41,25 @@ function Invoke-ExecGetAzureBillingCharges {
         $billingContext = Get-CIPPTable -tablename AzureBillingRawCharges
         $atMappingContext = Get-CIPPTable -tablename AzureBillingMapping
         $atUnmappedContext = Get-CIPPTable -tablename AzureBillingUnmappedCharges
+        $monthFilter = ([DateTime]::ParseExact($request.Query.billMonth, 'yyyyMMdd', $null).ToString('yyyy-MM'))
+
+        if (Get-ChargesWereSent -BillMonth $Request.Query.billMonth) {
+            Write-LogMessage -sev Warning -API 'Azure Billing' -message "Charges were already sent."
+            $respData = [PSCustomObject]@{
+                previousMonth = 0
+                rows          = @()
+                Alert         = "Billing has already been run for $($monthFilter). Please review sent charges."
+            }
+            return ([HttpResponseContext]@{
+                    StatusCode = [HttpStatusCode]::OK
+                    Body       = $respData
+                })
+        }
+
         $atMappingRows = Get-CIPPAzDataTableEntity @atMappingContext
 
         if ($atMappingRows.count -eq 0) {
             Write-LogMessage -sev Info -API 'Azure Billing' -message "Got no rows from AutotaskAzureMapping"
-        }
-
-        if ([bool]::Parse($request.Query.rerunJob)) {
-            Write-LogMessage -sev Info -API "Azure Billing" -message "Rerun billing job requested. $($Request.Query.rerunJob)"
         }
 
         $prevMonth = Get-PreviousMonthSentAmount -monthFilter $Request.Query.billMonth
@@ -78,7 +89,7 @@ function Invoke-ExecGetAzureBillingCharges {
             }
         }
 
-        $monthFilter = ([DateTime]::ParseExact($request.Query.billMonth, 'yyyyMMdd', $null).ToString('yyyy-MM'))
+
 
         $customers = GetArrowCustomers -hdrAuth $hdrAuth
 
@@ -135,6 +146,18 @@ function Invoke-ExecGetAzureBillingCharges {
             Body       = $respData
         })
 }
+
+function Get-ChargesWereSent {
+    param($BillMonth)
+
+    $partKey = ([DateTime]::ParseExact($request.Query.billMonth, 'yyyyMMdd', $null).ToString('yyyy-MM-28'))
+    $filter = "PartitionKey eq '$partKey'"
+    $tableContext = Get-CIPPTable -tablename AzureBillingChargesSent
+    $results = Get-CIPPAzDataTableEntity @tableContext -filter $Filter
+
+    return ($null -ne $results)
+}
+
 
 #This will return a row indicating a subscription had no data.
 function Get-NoDataRow {
