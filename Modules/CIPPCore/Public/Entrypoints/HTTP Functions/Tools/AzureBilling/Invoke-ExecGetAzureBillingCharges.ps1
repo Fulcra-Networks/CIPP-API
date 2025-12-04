@@ -4,7 +4,10 @@ using namespace System.Net
 
 function Invoke-ExecGetAzureBillingCharges {
     [CmdletBinding()]
-    param($Request, $TriggerMetadata)
+    param(
+        $Request,
+        $TriggerMetadata
+    )
 
     if ([String]::IsNullOrEmpty($request.Query.billMonth)) {
         $body = @("No date set")
@@ -41,9 +44,12 @@ function Invoke-ExecGetAzureBillingCharges {
         $billingContext = Get-CIPPTable -tablename AzureBillingRawCharges
         $atMappingContext = Get-CIPPTable -tablename AzureBillingMapping
         $atUnmappedContext = Get-CIPPTable -tablename AzureBillingUnmappedCharges
-        $monthFilter = ([DateTime]::ParseExact($request.Query.billMonth, 'yyyyMMdd', $null).ToString('yyyy-MM'))
 
-        if (Get-ChargesWereSent -BillMonth $Request.Query.billMonth) {
+        $monthFilter = ([DateTime]::ParseExact($request.Query.billMonth, 'yyyyMMdd', $null).ToString('yyyy-MM'))
+        $monthFilteryPartKey = ([DateTime]::ParseExact($request.Query.billMonth, 'yyyyMMdd', $null).ToString('yyyy-MM-28'))
+        $monthFilterFormatted = ([DateTime]::ParseExact($request.Query.billMonth, 'yyyyMMdd', $null))
+
+        if (Get-ChargesWereSent -BillMonth $monthFilteryPartKey) {
             Write-LogMessage -sev Warning -API 'Azure Billing' -message "Charges were already sent."
             $respData = [PSCustomObject]@{
                 previousMonth = 0
@@ -62,16 +68,16 @@ function Invoke-ExecGetAzureBillingCharges {
             Write-LogMessage -sev Info -API 'Azure Billing' -message "Got no rows from AutotaskAzureMapping"
         }
 
-        $prevMonth = Get-PreviousMonthSentAmount -monthFilter $Request.Query.billMonth
+        $prevMonth = Get-PreviousMonthSentAmount -monthFilter $monthFilterFormatted
 
         $body = @()
 
         if ([bool]::Parse($request.Query.rerunJob) -eq $false) {
-            $existingData = Get-ExistingBillingData -table $billingContext -date $request.Query.billMonth
+            $existingData = Get-ExistingBillingData -table $billingContext -date $monthFilter
             if ($existingData.count -gt 0) {
                 Write-LogMessage -sev Info -API "Azure Billing" -message "Existing records found and rerun not requested."
                 $mappedUnmapped = Get-MappedUnmappedCharges -azMonthSplit $existingData -body $body -atMapping $atMappingRows
-                $noDataRows = Get-NoApiDataRows -month $request.Query.billMonth
+                $noDataRows = Get-NoApiDataRows -month $monthFilter
                 $body = $mappedUnmapped.mapped
                 if ($null -ne $noDataRows) {
                     $body += $noDataRows
@@ -89,41 +95,42 @@ function Invoke-ExecGetAzureBillingCharges {
             }
         }
 
-
-
         $customers = GetArrowCustomers -hdrAuth $hdrAuth
 
         $targetSKUs = $CfgExtensionTbl.AzureBilling.SKU.split(',')
 
-        $no_data_rows = @()
-        foreach ($cust in $customers) {
-            #if ($cust.Reference -match $CfgExtensionTbl.AzureBilling.ExcludeCust) {
-            #    continue
-            #}
+        $no_data_rows = [System.Collections.Generic.List[object]]::new()
+        $allCharges = [System.Collections.Generic.List[object]]::new()
 
-            $subscriptions = GetCustLicenses -custId $cust.Reference -hdrAuth $hdrAuth
-            $subscriptions = $subscriptions | Where-Object { $targetSKUs -contains $_.sku } #"MS-AZR-0145P"
+        foreach ($cust in $customers) {
+            $allSubscriptions = GetCustLicenses -custId $cust.Reference -hdrAuth $hdrAuth
+            $subscriptions = $allSubscriptions | Where-Object { $targetSKUs -contains $_.sku } #"MS-AZR-0145P"
 
             foreach ($sub in $subscriptions) {
-                $conMonth = GetConsumptionMonthly -License $sub.license_id -hdrAuth $hdrAuth -MonthStart $monthFilter -MonthEnd $monthFilter
+                try {
+                    $conMonth = GetConsumptionMonthly -License $sub.license_id -hdrAuth $hdrAuth -MonthStart $monthFilter -MonthEnd $monthFilter
 
-                if ($conMonth.data.list.dataProvider.status -match 'consumed_valid') {
-                    $azMonthSplit = GetAzureConsumptionMonthSplit -License $sub.license_id -Subscription $sub -Customer $cust -GroupBy "resource group" -hdrAuth $hdrAuth -MonthStart $monthFilter -MonthEnd $monthFilter
-
-                    Write-ChargesToTable -table $billingContext -charges $azMonthSplit -rerun $Request.Query.rerunJob
+                    if ($conMonth.data.list.dataProvider.status -match 'consumed_valid') {
+                        $azMonthSplit = GetAzureConsumptionMonthSplit -License $sub.license_id -Subscription $sub -Customer $cust -GroupBy "resource group" -hdrAuth $hdrAuth -MonthStart $monthFilter -MonthEnd $monthFilter
+                        #Write-ChargesToTable -table $billingContext -charges $azMonthSplit -rerun $Request.Query.rerunJob
+                        $allCharges.Add($azMonthSplit)
+                    }
+                    elseif ($null -eq $conMonth -and $null -ne $sub) {
+                        #construct a 'no charges on sub data' object
+                        $no_data_rows.Add((Get-NoDataRow -customer $cust -subscription $sub -dateval $monthFilter))
+                    }
                 }
-                elseif ($null -eq $conMonth -and $null -ne $sub) {
-                    #construct a 'no charges on sub data' object
-                    $datestr = ([DateTime]::ParseExact($request.Query.billMonth, 'yyyyMMdd', $null).ToString('yyyy-MM'))
-                    $no_data_rows += Get-NoDataRow -customer $cust -subscription $sub -dateval $datestr
+                catch {
+                    Write-LogMessage -sev Error -API 'Azure Billing' -message "Error processing subscription $($sub.license_id) for customer $($cust.CompanyName): $($_.Exception.Message)"
+                    # Continue processing other subscriptions even if one fails
                 }
             }
         }
 
-
-        Write-NoDataRows $no_data_rows
-        $data = Get-ExistingBillingData -table $billingContext -date $request.Query.billMonth
-        $mappedUnmapped = Get-MappedUnmappedCharges -azMonthSplit $data -body $body -atMapping $atMappingRows
+        Write-ChargesToTable -table $billingContext -charges $allCharges -rerun $Request.Query.rerunJob
+        Write-NoDataRows -charges $no_data_rows
+        $data = Get-ExistingBillingData -table $billingContext -date $monthFilter
+        $mappedUnmapped = Get-MappedUnmappedCharges -azMonthSplit $data -atMapping $atMappingRows -monthFilterDate $monthFilterFormatted
         $body = $mappedUnmapped.mapped
         if ($null -ne $no_data_rows) {
             $body += $no_data_rows #This is to show which subscriptions returned no data.
@@ -150,8 +157,7 @@ function Invoke-ExecGetAzureBillingCharges {
 function Get-ChargesWereSent {
     param($BillMonth)
 
-    $partKey = ([DateTime]::ParseExact($request.Query.billMonth, 'yyyyMMdd', $null).ToString('yyyy-MM-28'))
-    $filter = "PartitionKey eq '$partKey'"
+    $filter = "PartitionKey eq '$BillMonth'"
     $tableContext = Get-CIPPTable -tablename AzureBillingChargesSent
     $results = Get-CIPPAzDataTableEntity @tableContext -filter $Filter
 
@@ -183,25 +189,31 @@ function Get-NoDataRow {
 }
 
 function Get-MappedUnmappedCharges {
-    param($azMonthSplit, $body, $atMapping)
+    param(
+        $azMonthSplit,
+        $body,
+        $atMapping,
+        $monthFilterDate
+    )
 
-    $unmappedCharges = @()
+    $mappedCharges = [System.Collections.Generic.List[object]]::new()
+    $unmappedCharges = [System.Collections.Generic.List[object]]::new()
 
     $atMappingHashTable = @{}
-    $atMapping | ForEach-Object {
-        if (-not [string]::IsNullOrEmpty($_.PartitionKey) -and -not [string]::IsNullOrEmpty($_.paxResourceGroupName)) {
-            $join = ("$($_.PartitionKey.Trim()) - $($_.paxResourceGroupName.Trim())").ToUpper()
-            $atMappingHashTable[$join] = $_
+    foreach ($mapping in $atMapping) {
+        if (-not [string]::IsNullOrEmpty($mapping.PartitionKey) -and -not [string]::IsNullOrEmpty($mapping.paxResourceGroupName)) {
+            $join = ("$($mapping.PartitionKey.Trim()) - $($mapping.paxResourceGroupName.Trim())").ToUpper()
+            $atMappingHashTable[$join] = $mapping
         }
     }
 
     #Expected final columns
     #chargeDate_customerId_customer_ResourceGroup_price_Vendor_cost_atCustId_allocationCodeId_chargeName_contractId_appendGroup_billableToAccount_atSumGroup
-    $azMonthSplit | ForEach-Object {
-        $join = ("$($_.licenseRef.Trim()) - $($_.group.Trim())").ToUpper()
+    foreach ($charge in $azMonthSplit) {
+        $join = ("$($charge.licenseRef.Trim()) - $($charge.group.Trim())").ToUpper()
 
-        if ($null -ne $_.PartitionKey) {
-            $chargeDate = [DateTime]::ParseExact("$($_.PartitionKey)-28", 'yyyy-MM-dd', $null).ToString("MM/dd/yyyy")
+        if ($null -ne $charge.PartitionKey) {
+            $chargeDate = [DateTime]::ParseExact("$($charge.PartitionKey)-28", 'yyyy-MM-dd', $null).ToString("MM/dd/yyyy")
         }
         else {
             continue
@@ -210,122 +222,115 @@ function Get-MappedUnmappedCharges {
         if ($atMappingHashTable.Contains($join)) {
             $mapping = $atMappingHashTable[$join]
 
-            $price = $_.totalList
+            $price = $charge.totalList
 
             if ($mapping.markup) {
                 $price += ($price * $mapping.markup)
             }
 
-            # if($mapping.billableToAccount){
-            # }
-
-            $body += @{
-                chargeDate        = $chargeDate
-                customerId        = $_.customerRef
-                customer          = $_.customer
-                subscriptionId    = $_.licenseRef
-                "Resource Group"  = ($_.group.toupper())
-                price             = $price
-                cost              = $_.totalReseller
-                vendor            = "Arrow"
-                atCustId          = $mapping.atCustId
-                allocationCodeId  = $mapping.allocationCodeId
-                chargeName        = $mapping.chargeName
-                appendGroup       = $mapping.appendGroup
-                contractId        = $mapping.contractId
-                billableToAccount = $mapping.billableToAccount
-                atSumGroup        = $mapping.atSumGroup
-            }
+            $mappedCharges.Add(@{
+                    chargeDate        = $chargeDate
+                    customerId        = $charge.customerRef
+                    customer          = $charge.customer
+                    subscriptionId    = $charge.licenseRef
+                    "Resource Group"  = ($charge.group.toupper())
+                    price             = $price
+                    cost              = $charge.totalReseller
+                    vendor            = "Arrow"
+                    atCustId          = $mapping.atCustId
+                    allocationCodeId  = $mapping.allocationCodeId
+                    chargeName        = $mapping.chargeName
+                    appendGroup       = $mapping.appendGroup
+                    contractId        = $mapping.contractId
+                    billableToAccount = $mapping.billableToAccount
+                    atSumGroup        = $mapping.atSumGroup
+                })
         }
         else {
-            $unmappedCharges += @{
-                chargeDate       = $chargeDate
-                customerId       = $_.customerRef
-                customer         = $_.customer
-                subscriptionId   = $_.licenseRef
-                "Resource Group" = ($_.group.toupper())
-                price            = $_.totalList
-                cost             = $_.totalReseller
-                vendor           = "Arrow"
-            }
+            $unmappedCharges.Add(@{
+                    chargeDate       = $chargeDate
+                    customerId       = $charge.customerRef
+                    customer         = $charge.customer
+                    subscriptionId   = $charge.licenseRef
+                    "Resource Group" = ($charge.group.toupper())
+                    price            = $charge.totalList
+                    cost             = $charge.totalReseller
+                    vendor           = "Arrow"
+                })
         }
     }
 
-    return @{mapped = $body; unmapped = $unmappedCharges }
+    return @{mapped = $mappedCharges.ToArray(); unmapped = $unmappedCharges.ToArray() }
 }
 
 function Write-NoDataRows {
     param($charges)
 
     $noDataContext = Get-CIPPTable -tablename AzureBillingNoDataSubscriptions
-    foreach ($line in $charges) {
-        try {
-            $AddObject = @{
-                PartitionKey      = $line.chargeDate
-                RowKey            = "$($line.subscriptionId) - $($line.customerId)"
-                subscriptionId    = $line.subscriptionId
-                chargeDate        = $line.chargeDate
-                customerId        = $line.customerId
-                customer          = $line.customer
-                "Resource Group"  = "NO DATA FROM ARROW"
-                price             = 0.0
-                cost              = 0.0
-                vendor            = "Arrow"
-                atCustId          = -1
-                allocationCodeId  = -1
-                chargeName        = "N/A"
-                appendGroup       = $false
-                contractId        = -1
-                billableToAccount = $false
-                atSumGroup        = $false
-            }
-
-            Add-CIPPAzDataTableEntity @noDataContext -Entity $AddObject -Force
-
-            Write-LogMessage -sev Debug -API 'Azure Billing' -message "Added no api data row for $($line.customer)"
-        }
-        catch {
-            Write-LogMessage -sev Error -API 'Azure Billing' -message "Error writing no api data row to table $($_.Exception.Message) - AddObject JSON: $($AddObject|ConvertTo-JSON -Depth 10 -compress)"
+    $addObjects = foreach ($line in $charges) {
+        @{
+            PartitionKey      = $line.chargeDate
+            RowKey            = "$($line.subscriptionId) - $($line.customerId)"
+            subscriptionId    = $line.subscriptionId
+            chargeDate        = $line.chargeDate
+            customerId        = $line.customerId
+            customer          = $line.customer
+            "Resource Group"  = "NO DATA FROM ARROW"
+            price             = 0.0
+            cost              = 0.0
+            vendor            = "Arrow"
+            atCustId          = -1
+            allocationCodeId  = -1
+            chargeName        = "N/A"
+            appendGroup       = $false
+            contractId        = -1
+            billableToAccount = $false
+            atSumGroup        = $false
         }
     }
+
+    Add-CIPPAzDataTableEntity @noDataContext -Entity $addObjects -Force
 }
 
 function Write-ChargesToTable {
-    param($table, $charges, $rerun)
+    param(
+        $table,
+        $charges,
+        $rerun
+    )
 
-    foreach ($line in $azMonthSplit.lines) {
 
-        try {
-            switch ($($line.group)) {
-                "N/A" { $line.group = "NA"; break }
-            }
-
-            $AddObject = @{
-                PartitionKey  = $line.month
-                RowKey        = "$($line.licenseRef) - $($line.group)"
-                currency      = $line.currency
-                customer      = $line.customer
-                customerRef   = $line.customerRef
-                group         = $line.group
-                licenseRef    = $line.licenseRef
-                totalCustomer = ([math]::Round($line.totalCustomer, 2))
-                totalList     = ([math]::Round($line.totalList, 2))
-                totalReseller = ([math]::Round($line.totalReseller, 2))
-            }
-
-            if ([bool]::Parse($rerun)) {
-                Add-CIPPAzDataTableEntity @table -Entity $AddObject -Force
-            }
-            else {
-                Add-CIPPAzDataTableEntity @table -Entity $AddObject
-            }
-            Write-LogMessage -sev Debug -API 'Azure Billing' -message "Added azure billing for $($line.customer)"
+    $addObjects = foreach ($line in $charges | Select-Object -ExpandProperty lines) {
+        if ($line.group -eq "N/A") {
+            $line.group = "NA"
         }
-        catch {
-            Write-LogMessage -sev Error -API 'Azure Billing' -message "Error writing charges to table $($_.Exception.Message)"
+
+        @{
+            PartitionKey  = $line.month
+            RowKey        = "$($line.licenseRef) - $($line.group)"
+            currency      = $line.currency
+            customer      = $line.customer
+            customerRef   = $line.customerRef
+            group         = $line.group
+            licenseRef    = $line.licenseRef
+            totalCustomer = ([math]::Round($line.totalCustomer, 2))
+            totalList     = ([math]::Round($line.totalList, 2))
+            totalReseller = ([math]::Round($line.totalReseller, 2))
         }
     }
+
+
+    if ([bool]::Parse($rerun)) {
+        Add-CIPPAzDataTableEntity @table -Entity $addObjects -Force
+    }
+    else {
+        Add-CIPPAzDataTableEntity @table -Entity $addObjects
+    }
+    Write-LogMessage -sev Debug -API 'Azure Billing' -message "Batch wrote $($addObjects.Count) charge records"
+
 }
+
+
 
 function Write-UnmappedToTable {
     param($table, $unmappedcharges)
@@ -353,35 +358,33 @@ function Write-UnmappedToTable {
 }
 
 function Get-ExistingBillingData {
-    param($table, $date)
-    try {
-        $existingData = @()
+    param(
+        $table,
+        $date
+    )
 
-        $Filter = "PartitionKey eq '$([DateTime]::ParseExact($date,'yyyyMMdd',$null).ToString('yyyy-MM'))'"
+    try {
+        $Filter = "PartitionKey eq '$date'"
         $existingData = Get-CIPPAzDataTableEntity @table -filter $Filter
 
         return $existingData
     }
     catch {
         Write-LogMessage -sev Error -API 'Azure Billing' -message "Error getting existing billing data: $($_.Exception.Message)"
-        return $null
+        return @()
     }
 }
 
 function Get-NoApiDataRows {
-    param($month)
+    param($monthFilter)
     try {
         $noDataContext = Get-CIPPTable -tablename AzureBillingNoDataSubscriptions
 
-        $monthFilter = ([DateTime]::ParseExact($request.Query.billMonth, 'yyyyMMdd', $null).ToString('yyyy-MM'))
         $Filter = "PartitionKey eq '$monthFilter'"
         $existingData = Get-CIPPAzDataTableEntity @noDataContext -filter $Filter
 
-        Write-Host "$('*'*60)$monthFilter, $Filter,  $($existingdata|convertto-json -depth 10)"
-
-        $noDataRows = @()
-        $existingData | ForEach-Object {
-            $noDataRows += @{
+        $noDataRows = $existingData | ForEach-Object {
+            @{
                 chargeDate        = $_.PartitionKey
                 customerId        = $_.customerId
                 customer          = $_.customer
@@ -404,7 +407,7 @@ function Get-NoApiDataRows {
     }
     catch {
         Write-LogMessage -sev Error -API 'Azure Billing' -message "Error getting no-apidata rows: $($_.Exception.Message)"
-        return $null
+        return @()
     }
 }
 
@@ -530,7 +533,7 @@ function Get-PreviousMonthSentAmount {
 
     try {
         #This takes the month filter passed by the UI and reduces the months by 1 and formats it for the partition key for the "AzureBillingChargesSent" table.
-        $monthFilter = ([DateTime]::ParseExact($request.Query.billMonth, 'yyyyMMdd', $null).AddMonths(-1).ToString('yyyy-MM-28'))
+        $monthFilter = $monthFilter.AddMonths(-1).ToString('yyyy-MM-28')
 
         $table = Get-CIPPTable -tablename AzureBillingChargesSent
 
@@ -539,7 +542,7 @@ function Get-PreviousMonthSentAmount {
         $sentData = Get-CIPPAzDataTableEntity @table -filter $sentFilter
 
         if ($null -eq $sentData) {
-            return $sentAmount;
+            return $sentAmount
         }
 
         $sentAmount = (($sentData | Measure-Object -Property price -Sum).Sum).ToString("0.00")
