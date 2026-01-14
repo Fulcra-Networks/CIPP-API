@@ -105,13 +105,15 @@ function Get-MappedChargesToSend {
     param($azMonthSplit, $body, $atMapping)
 
     $atMappingHashTable = @{}
-    $atMapping | ForEach-Object {
-        if ([string]::IsNullOrEmpty($_.PartitionKey) -or [string]::IsNullOrEmpty($_.paxResourceGroupName)) {
-            Write-Host "$('*'*60) Empty PartitionKey or paxResourceGroupName..."
+    foreach ($mapping in $atMapping) {
+        if ($mapping.PSObject.Properties.Name -contains 'isEnabled') {
+            if ($mapping.isEnabled -eq $false) {
+                continue;
+            }
         }
-        else {
-            $join = ("$($_.PartitionKey.Trim()) - $($_.paxResourceGroupName.Trim())").ToUpper()
-            $atMappingHashTable[$join] = $_
+        if (-not [string]::IsNullOrEmpty($mapping.PartitionKey) -and -not [string]::IsNullOrEmpty($mapping.paxResourceGroupName)) {
+            $join = ("$($mapping.PartitionKey.Trim()) - $($mapping.paxResourceGroupName.Trim())").ToUpper()
+            $atMappingHashTable[$join] = $mapping
         }
     }
 
@@ -124,7 +126,6 @@ function Get-MappedChargesToSend {
             $chargeDate = [DateTime]::ParseExact("$($_.PartitionKey)-28", 'yyyy-MM-dd', $null)
         }
         else {
-            Write-Host "$('*'*60) Bad chargedate value"
             continue
         }
 

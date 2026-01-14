@@ -201,6 +201,11 @@ function Get-MappedUnmappedCharges {
 
     $atMappingHashTable = @{}
     foreach ($mapping in $atMapping) {
+        if ($mapping.PSObject.Properties.Name -contains 'isEnabled') {
+            if ($mapping.isEnabled -eq $false) {
+                continue;
+            }
+        }
         if (-not [string]::IsNullOrEmpty($mapping.PartitionKey) -and -not [string]::IsNullOrEmpty($mapping.paxResourceGroupName)) {
             $join = ("$($mapping.PartitionKey.Trim()) - $($mapping.paxResourceGroupName.Trim())").ToUpper()
             $atMappingHashTable[$join] = $mapping

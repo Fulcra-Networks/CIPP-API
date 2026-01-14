@@ -4,8 +4,6 @@ function Invoke-ExecDisableBillingMapping {
     [CmdletBinding()]
     param($Request, $TriggerMetadata)
 
-    write-host "$('*'*60) $($Request.Query.action)ing mapping"
-    write-host "$($Request|ConvertTo-JSON -Depth 10)"
     $action = $Request.Query.action.ToLower() -eq "enable"
     $mappingContext = Get-CIPPTable -tablename AzureBillingMapping
 
