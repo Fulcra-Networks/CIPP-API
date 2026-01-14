@@ -51,6 +51,11 @@ function Invoke-ListAzureBillingMappings {
     $results = @()
     foreach ($mapping in $mappings) {
         $markup = "0%"
+        [bool]$isEnabled = $true;
+        if($mapping.isEnabled -ne $null){
+            $isEnabled = $mapping.isEnabled
+        }
+
         if (-not [String]::IsNullOrEmpty($mapping.markup)) { $markup = "$($mapping.markup*100)%" }
         $results += [PSCustomObject] @{
             key           = "$($mapping.PartitionKey)~$($mapping.RowKey)"
@@ -59,6 +64,7 @@ function Invoke-ListAzureBillingMappings {
             Billable      = $mapping.billableToAccount
             Markup        = $markup
             ResourceGroup = $mapping.paxResourceGroupName
+            Enabled       = $isEnabled
         }
     }
 

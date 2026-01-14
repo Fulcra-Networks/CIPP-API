@@ -5674,6 +5674,36 @@
         }
       }
     },
+    "/ExecDisableBillingMapping": {
+      "get": {
+        "description": "Disable an azure billing mapping",
+        "summary": "Disables azure billing mapping by partition key and rowkey.",
+        "tags": [],
+        "parameters": [
+          {
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "name": "mappingId",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {},
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful operation"
+          }
+        }
+      }
+    },
     "/AddUpdateAzureBillingMapping": {
       "post": {
         "description": "Adds or updates an azure billing mapping",
