@@ -272,29 +272,35 @@ function Write-NoDataRows {
     param($charges)
 
     $noDataContext = Get-CIPPTable -tablename AzureBillingNoDataSubscriptions
-    $addObjects = foreach ($line in $charges) {
-        @{
-            PartitionKey      = $line.chargeDate
-            RowKey            = "$($line.subscriptionId) - $($line.customerId)"
-            subscriptionId    = $line.subscriptionId
-            chargeDate        = $line.chargeDate
-            customerId        = $line.customerId
-            customer          = $line.customer
-            "Resource Group"  = "NO DATA FROM ARROW"
-            price             = 0.0
-            cost              = 0.0
-            vendor            = "Arrow"
-            atCustId          = -1
-            allocationCodeId  = -1
-            chargeName        = "N/A"
-            appendGroup       = $false
-            contractId        = -1
-            billableToAccount = $false
-            atSumGroup        = $false
+    $addObjects = @()
+    try {
+        $addObjects = foreach ($line in $charges) {
+            @{
+                PartitionKey      = $line.chargeDate
+                RowKey            = "ND-$($line.subscriptionId) - $($line.customerId)-ND"
+                subscriptionId    = $line.subscriptionId
+                chargeDate        = $line.chargeDate
+                customerId        = $line.customerId
+                customer          = $line.customer
+                "Resource Group"  = "NO DATA FROM ARROW"
+                price             = 0.0
+                cost              = 0.0
+                vendor            = "Arrow"
+                atCustId          = -1
+                allocationCodeId  = -1
+                chargeName        = "N/A"
+                appendGroup       = $false
+                contractId        = -1
+                billableToAccount = $false
+                atSumGroup        = $false
+            }
         }
-    }
 
-    Add-CIPPAzDataTableEntity @noDataContext -Entity $addObjects -Force
+        Add-CIPPAzDataTableEntity @noDataContext -Entity $addObjects -Force
+    }
+    catch {
+        Write-LogMessage -sev Error -API 'Azure Billing' -message "Write-NoDataRows error: $($_.Exception.Message). $($addObjects|ConvertTo-Json -Depth 10 -Compress)"
+    }
 }
 
 function Write-ChargesToTable {
@@ -305,34 +311,40 @@ function Write-ChargesToTable {
     )
 
 
-    $addObjects = foreach ($line in $charges | Select-Object -ExpandProperty lines) {
-        if ($line.group -eq "N/A") {
-            $line.group = "NA"
+
+    $addObjects = @()
+    try {
+        $addObjects = foreach ($line in $charges | Select-Object -ExpandProperty lines) {
+            if ($line.group -eq "N/A") {
+                $line.group = "NA"
+            }
+
+            @{
+                PartitionKey  = $line.month
+                RowKey        = "$($line.licenseRef) - $($line.group)"
+                currency      = $line.currency
+                customer      = $line.customer
+                customerRef   = $line.customerRef
+                group         = $line.group
+                licenseRef    = $line.licenseRef
+                totalCustomer = ([math]::Round($line.totalCustomer, 2))
+                totalList     = ([math]::Round($line.totalList, 2))
+                totalReseller = ([math]::Round($line.totalReseller, 2))
+            }
         }
 
-        @{
-            PartitionKey  = $line.month
-            RowKey        = "$($line.licenseRef) - $($line.group)"
-            currency      = $line.currency
-            customer      = $line.customer
-            customerRef   = $line.customerRef
-            group         = $line.group
-            licenseRef    = $line.licenseRef
-            totalCustomer = ([math]::Round($line.totalCustomer, 2))
-            totalList     = ([math]::Round($line.totalList, 2))
-            totalReseller = ([math]::Round($line.totalReseller, 2))
+
+        if ([bool]::Parse($rerun)) {
+            Add-CIPPAzDataTableEntity @table -Entity $addObjects -Force
         }
+        else {
+            Add-CIPPAzDataTableEntity @table -Entity $addObjects
+        }
+        Write-LogMessage -sev Debug -API 'Azure Billing' -message "Batch wrote $($addObjects.Count) charge records"
     }
-
-
-    if ([bool]::Parse($rerun)) {
-        Add-CIPPAzDataTableEntity @table -Entity $addObjects -Force
+    catch {
+        Write-LogMessage -sev Error -API 'Azure Billing' -message "Write-ChargesToTable error: $($_.Exception.Message). $($addObjects|ConvertTo-Json -Depth 10 -Compress)"
     }
-    else {
-        Add-CIPPAzDataTableEntity @table -Entity $addObjects
-    }
-    Write-LogMessage -sev Debug -API 'Azure Billing' -message "Batch wrote $($addObjects.Count) charge records"
-
 }
 
 
