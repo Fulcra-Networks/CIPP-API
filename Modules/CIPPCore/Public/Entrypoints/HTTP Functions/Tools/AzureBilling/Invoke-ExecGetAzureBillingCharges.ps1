@@ -173,7 +173,7 @@ function Get-NoDataRow {
         customerId        = $customer.Reference
         customer          = $customer.companyName
         subscriptionId    = $subscription.license_id
-        "Resource Group"  = "NO DATA FROM ARROW"
+        "ResourceGroup"  = "NO DATA FROM ARROW"
         price             = 0.0
         cost              = 0.0
         vendor            = "Arrow"
@@ -282,7 +282,7 @@ function Write-NoDataRows {
                 chargeDate        = $line.chargeDate
                 customerId        = $line.customerId
                 customer          = $line.customer
-                "Resource Group"  = "NO DATA FROM ARROW"
+                "ResourceGroup"  = "NO DATA FROM ARROW"
                 price             = 0.0
                 cost              = 0.0
                 vendor            = "Arrow"
