@@ -106,31 +106,58 @@ function Send-CIPPAlert {
 
     if ($Type -eq 'webhook') {
         Write-Information 'Trying to send webhook'
-        $JSONBody = Get-CIPPTextReplacement -TenantFilter $TenantFilter -Text $JSONContent -EscapeForJson
+
+        $ExtensionTable = Get-CIPPTable -TableName Extensionsconfig
+        $Configuration = ((Get-CIPPAzDataTableEntity @ExtensionTable).config | ConvertFrom-Json)
+
+        if ($Configuration.CFZTNA.WebhookEnabled -eq $true -and $Configuration.CFZTNA.Enabled -eq $true) {
+            $CFAPIKey = Get-ExtensionAPIKey -Extension 'CFZTNA'
+            $Headers = @{'CF-Access-Client-Id' = $Configuration.CFZTNA.ClientId; 'CF-Access-Client-Secret' = "$CFAPIKey" }
+            Write-Information 'CF-Access-Client-Id and CF-Access-Client-Secret headers added to webhook API request'
+        } else {
+            $Headers = $null
+        }
+
+        $ReplacedContent = Get-CIPPTextReplacement -TenantFilter $TenantFilter -Text $JSONContent -EscapeForJson
         try {
             if (![string]::IsNullOrWhiteSpace($Config.webhook) -or ![string]::IsNullOrWhiteSpace($AltWebhook)) {
                 if ($PSCmdlet.ShouldProcess($Config.webhook, 'Sending webhook')) {
                     $webhook = if ($AltWebhook) { $AltWebhook } else { $Config.webhook }
                     switch -wildcard ($webhook) {
                         '*webhook.office.com*' {
-                            $JSONBody = "{`"text`": `"You've setup your alert policies to be alerted whenever specific events happen. We've found some of these events in the log. <br><br>$JSONContent`"}"
-                            Invoke-RestMethod -Uri $webhook -Method POST -ContentType 'Application/json' -Body $JSONBody
+                            $TeamsBody = [PSCustomObject]@{
+                                text = "You've setup your alert policies to be alerted whenever specific events happen. We've found some of these events in the log. <br><br>$ReplacedContent"
+                            } | ConvertTo-Json -Compress
+                            Invoke-RestMethod -Uri $webhook -Method POST -ContentType 'Application/json' -Body $TeamsBody
                         }
                         '*discord.com*' {
-                            $JSONBody = "{`"content`": `"You've setup your alert policies to be alerted whenever specific events happen. We've found some of these events in the log. $JSONContent`"}"
-                            Invoke-RestMethod -Uri $webhook -Method POST -ContentType 'Application/json' -Body $JSONBody
+                            $DiscordBody = [PSCustomObject]@{
+                                content = "You've setup your alert policies to be alerted whenever specific events happen. We've found some of these events in the log. ``````$ReplacedContent``````"
+                            } | ConvertTo-Json -Compress
+                            Invoke-RestMethod -Uri $webhook -Method POST -ContentType 'Application/json' -Body $DiscordBody
                         }
                         '*slack.com*' {
                             $SlackBlocks = Get-SlackAlertBlocks -JSONBody $JSONContent
                             if ($SlackBlocks.blocks) {
-                                $JSONBody = $SlackBlocks | ConvertTo-Json -Depth 10 -Compress
+                                $SlackBody = $SlackBlocks | ConvertTo-Json -Depth 10 -Compress
                             } else {
-                                $JSONBody = "{`"text`": `"You've setup your alert policies to be alerted whenever specific events happen. We've found some of these events in the log. $JSONContent`"}"
+                                $SlackBody = [PSCustomObject]@{
+                                    text = "You've setup your alert policies to be alerted whenever specific events happen. We've found some of these events in the log. ``````$ReplacedContent``````"
+                                } | ConvertTo-Json -Compress
                             }
-                            Invoke-RestMethod -Uri $webhook -Method POST -ContentType 'Application/json' -Body $JSONBody
+                            Invoke-RestMethod -Uri $webhook -Method POST -ContentType 'Application/json' -Body $SlackBody
                         }
                         default {
-                            Invoke-RestMethod -Uri $webhook -Method POST -ContentType 'Application/json' -Body $JSONContent
+                            $RestMethod = @{
+                                Uri         = $webhook
+                                Method      = 'POST'
+                                ContentType = 'application/json'
+                                Body        = $ReplacedContent
+                            }
+                            if ($Headers) {
+                                $RestMethod['Headers'] = $Headers
+                            }
+                            Invoke-RestMethod @RestMethod
                         }
                     }
                 }
@@ -143,6 +170,7 @@ function Send-CIPPAlert {
             $ErrorMessage = Get-CippException -Exception $_
             Write-Information "Could not send alerts to webhook: $($ErrorMessage.NormalizedError)"
             Write-LogMessage -API 'Webhook Alerts' -message "Could not send alerts to webhook: $($ErrorMessage.NormalizedError)" -tenant $TenantFilter -sev error -LogData $ErrorMessage
+            return "Could not send alerts to webhook: $($ErrorMessage.NormalizedError)"
         }
     }
 

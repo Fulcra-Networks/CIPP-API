@@ -13,10 +13,17 @@ SendNotifications/config.json
 .vscode/settings.json
 .vscode/tasks.json
 .env
-
+Output/
+node_modules/.yarn-integrity
+yarn.lock
 
 # Cursor IDE
 .cursor/rules
 
 # AI
 CLAUDE.md
+.claude
+
+# Ignore all root PowerShell files except profile.ps1
+/*.ps1
+!/profile.ps1

@@ -39,7 +39,9 @@ function Invoke-ListIntuneTemplates {
                 $data | Add-Member -NotePropertyName 'Type' -NotePropertyValue $JSONData.Type -Force
                 $data | Add-Member -NotePropertyName 'GUID' -NotePropertyValue $_.RowKey -Force
                 $data | Add-Member -NotePropertyName 'package' -NotePropertyValue $_.Package -Force
-                $data | Add-Member -NotePropertyName 'isSynced' -NotePropertyValue (![string]::IsNullOrEmpty($_.SHA))
+                $data | Add-Member -NotePropertyName 'isSynced' -NotePropertyValue (![string]::IsNullOrEmpty($_.SHA)) -Force
+                $data | Add-Member -NotePropertyName 'source' -NotePropertyValue $_.Source -Force
+                $data | Add-Member -NotePropertyName 'reusableSettings' -NotePropertyValue $JSONData.ReusableSettings -Force
                 $data
             } catch {
 
@@ -56,7 +58,7 @@ function Invoke-ListIntuneTemplates {
                     value         = $package
                     type          = 'tag'
                     templateCount = ($RawTemplates | Where-Object { $_.Package -eq $package }).Count
-                    templates     = ($RawTemplates | Where-Object { $_.Package -eq $package } | ForEach-Object {
+                    templates     = @($RawTemplates | Where-Object { $_.Package -eq $package } | ForEach-Object {
                             try {
                                 $JSONData = $_.JSON | ConvertFrom-Json -Depth 100 -ErrorAction SilentlyContinue
                                 $data = $JSONData.RAWJson | ConvertFrom-Json -Depth 100 -ErrorAction SilentlyContinue
@@ -65,6 +67,9 @@ function Invoke-ListIntuneTemplates {
                                 $data | Add-Member -NotePropertyName 'Type' -NotePropertyValue $JSONData.Type -Force
                                 $data | Add-Member -NotePropertyName 'GUID' -NotePropertyValue $_.RowKey -Force
                                 $data | Add-Member -NotePropertyName 'package' -NotePropertyValue $_.Package -Force
+                                $data | Add-Member -NotePropertyName 'source' -NotePropertyValue $_.Source -Force
+                                $data | Add-Member -NotePropertyName 'isSynced' -NotePropertyValue (![string]::IsNullOrEmpty($_.SHA)) -Force
+                                $data | Add-Member -NotePropertyName 'reusableSettings' -NotePropertyValue $JSONData.ReusableSettings -Force
                                 $data
                             } catch {
 
