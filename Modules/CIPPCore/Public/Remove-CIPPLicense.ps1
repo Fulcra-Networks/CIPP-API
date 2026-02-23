@@ -29,11 +29,12 @@ function Remove-CIPPLicense {
                 PSA     = $false
             }
         }
-        Add-CIPPScheduledTask -Task $ScheduledTask -hidden $false
+        Add-CIPPScheduledTask -Task $ScheduledTask -hidden $false -DisallowDuplicateName $true
         return "Scheduled license removal for $username"
     } else {
         try {
-            $ConvertTable = Import-Csv ConversionTable.csv
+            $ModuleBase = Get-Module -Name CIPPCore | Select-Object -ExpandProperty ModuleBase
+            $ConvertTable = Import-Csv (Join-Path $ModuleBase 'lib\data\ConversionTable.csv')
             $User = New-GraphGetRequest -uri "https://graph.microsoft.com/beta/users/$($userid)" -tenantid $tenantFilter
             $GroupMemberships = New-GraphGetRequest -uri "https://graph.microsoft.com/beta/users/$($userid)/memberOf/microsoft.graph.group?`$select=id,displayName,assignedLicenses" -tenantid $tenantFilter
             $LicenseGroups = $GroupMemberships | Where-Object { ($_.assignedLicenses | Measure-Object).Count -gt 0 }

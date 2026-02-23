@@ -44,8 +44,9 @@ function Invoke-HuduExtensionSync {
         $CIPPURL = 'https://{0}' -f $Config.Value
         $EnableCIPP = $true
 
-        # Get Hudu Extension Cache
-        $ExtensionCache = Get-ExtensionCacheData -TenantFilter $Tenant.defaultDomainName
+        # Get CIPP Extension Reporting Data (from new CippReportingDB)
+        # Include mailboxes if needed for Hudu sync
+        $ExtensionCache = Get-CippExtensionReportingData -TenantFilter $Tenant.defaultDomainName -IncludeMailboxes
         $company_id = $TenantMap.IntegrationId
 
         # If tenant not found in mapping table, return error
@@ -65,18 +66,19 @@ function Invoke-HuduExtensionSync {
                 $CreateUsers = $Configuration.CreateMissingUsers
                 $PeopleLayout = Get-HuduAssetLayouts -Id $PeopleLayoutId
                 if ($PeopleLayout.id) {
-                    $People = Get-HuduAssets -CompanyId $company_id -AssetLayoutId $PeopleLayout.id
+                    $PeopleArray = Get-HuduAssets -CompanyId $company_id -AssetLayoutId $PeopleLayout.id
+                    $People = [System.Collections.Generic.List[object]]::new($PeopleArray)
                 } else {
                     $CreateUsers = $false
-                    $People = @()
+                    $People = [System.Collections.Generic.List[object]]::new()
                 }
             } else {
                 $CreateUsers = $false
-                $People = @()
+                $People = [System.Collections.Generic.List[object]]::new()
             }
         } catch {
             $CreateUsers = $false
-            $People = @()
+            $People = [System.Collections.Generic.List[object]]::new()
             $CompanyResult.Errors.add("Company: Unable to fetch People $_")
             Write-Host "Hudu People - Error: $_"
         }
@@ -90,18 +92,18 @@ function Invoke-HuduExtensionSync {
                 $DesktopsLayout = Get-HuduAssetLayouts -Id $DeviceLayoutId
                 if ($DesktopsLayout.id) {
                     $HuduDesktopDevices = Get-HuduAssets -CompanyId $company_id -AssetLayoutId $DesktopsLayout.id
-                    $HuduDevices = $HuduDesktopDevices
+                    $HuduDevices = [System.Collections.Generic.List[object]]::new($HuduDesktopDevices)
                 } else {
                     $CreateDevices = $false
-                    $HuduDevices = @()
+                    $HuduDevices = [System.Collections.Generic.List[object]]::new()
                 }
             } else {
                 $CreateDevices = $false
-                $HuduDevices = @()
+                $HuduDevices = [System.Collections.Generic.List[object]]::new()
             }
         } catch {
             $CreateDevices = $false
-            $HuduDevices = @()
+            $HuduDevices = [System.Collections.Generic.List[object]]::new()
             $CompanyResult.Errors.add("Company: Unable to fetch Devices $_")
             Write-Host "Hudu Devices - Error: $_"
         }
@@ -166,8 +168,8 @@ function Invoke-HuduExtensionSync {
 
 
         $Roles = foreach ($Role in $AllRoles) {
-            # Get members from cache
-            $Members = ($ExtensionCache."AllRoles_$($Role.id)")
+            # Members are now inline with each role object
+            $Members = $Role.members
             [PSCustomObject]@{
                 ID            = $Role.id
                 DisplayName   = $Role.displayName
@@ -254,7 +256,9 @@ function Invoke-HuduExtensionSync {
         $DeviceCompliancePolicies = $ExtensionCache.DeviceCompliancePolicies
 
         $DeviceComplianceDetails = foreach ($Policy in $DeviceCompliancePolicies) {
-            $DeviceStatuses = $ExtensionCache."DeviceCompliancePolicies_$($Policy.id)"
+            # Device statuses are cached per policy with new naming: IntuneDeviceCompliancePolicies_{policyId}
+            $DeviceStatusItems = Get-CIPPDbItem -TenantFilter $TenantFilter -Type "IntuneDeviceCompliancePolicies_$($Policy.id)" | Where-Object { $_.RowKey -notlike '*-Count' }
+            $DeviceStatuses = if ($DeviceStatusItems) { $DeviceStatusItems | ForEach-Object { $_.Data | ConvertFrom-Json } } else { @() }
             [pscustomobject]@{
                 ID             = $Policy.id
                 DisplayName    = $Policy.displayName
@@ -265,7 +269,8 @@ function Invoke-HuduExtensionSync {
         $AllGroups = $ExtensionCache.Groups
 
         $Groups = foreach ($Group in $AllGroups) {
-            $Members = $ExtensionCache."Groups_$($Group.id)"
+            # Members are now inline with each group object
+            $Members = $Group.members
             [pscustomobject]@{
                 ID          = $Group.id
                 DisplayName = $Group.displayName
@@ -749,6 +754,8 @@ function Invoke-HuduExtensionSync {
                                         Hash         = [string]$NewHash
                                     }
                                     Add-CIPPAzDataTableEntity @HuduAssetCache -Entity $AssetCache -Force
+                                    # Add newly created user to the People collection to prevent duplicates
+                                    $People.Add($CreateHuduUser)
                                 }
                             }
                         } else {
@@ -993,6 +1000,8 @@ function Invoke-HuduExtensionSync {
                                         Hash         = [string]$NewHash
                                     }
                                     Add-CIPPAzDataTableEntity @HuduAssetCache -Entity $AssetCache -Force
+                                    # Add newly created device to the HuduDevices collection to prevent duplicates
+                                    $HuduDevices.Add($CreateHuduDevice)
 
                                     $RelHuduUser = $People | Where-Object { $_.primary_mail -eq $Device.userPrincipalName -or ($_.cards.integrator_name -eq 'cw_manage' -and $_.cards.data.communicationItems.communicationType -eq 'Email' -and $_.cards.data.communicationItems.value -eq $Device.userPrincipalName) }
                                     if ($RelHuduUser) {
