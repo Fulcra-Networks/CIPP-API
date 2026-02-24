@@ -7,7 +7,7 @@ function Get-AutotaskToken {
     Import-Module AutotaskAPI
 
     if (!$ENV:AutotaskSecret) {
-        $null = Connect-AzAccount -Identity
+        #$null = Connect-AzAccount -Identity
         $ClientSecret = (Get-CIPPKeyVaultSecret -VaultName $ENV:WEBSITE_DEPLOYMENT_ID -Name 'Autotask' -AsPlainText)
     } else {
         $ClientSecret = $ENV:AutotaskSecret

@@ -11,7 +11,7 @@ function Get-IronScalesToken {
 
 
     if (!$ENV:IronScalesSecret) {
-        $null = Connect-AzAccount -Identity
+        #$null = Connect-AzAccount -Identity
         $ClientSecret = (Get-CIPPKeyVaultSecret -VaultName $ENV:WEBSITE_DEPLOYMENT_ID -Name 'IronScales' -AsPlainText)
     } else {
         $ClientSecret = $ENV:IronScalesSecret
