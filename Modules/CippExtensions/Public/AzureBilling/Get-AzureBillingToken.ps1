@@ -42,7 +42,7 @@ function GetAzureBillingSecret {
 
     if (!$ENV:ArrowSecret) {
         $null = Connect-AzAccount -Identity
-        $secret = (Get-AzKeyVaultSecret -VaultName $ENV:WEBSITE_DEPLOYMENT_ID -Name 'AzureBilling' -AsPlainText)
+        $secret = (Get-CIPPKeyVaultSecret -VaultName $ENV:WEBSITE_DEPLOYMENT_ID -Name 'AzureBilling' -AsPlainText)
     } else {
         $secret = $ENV:ArrowSecret
     }

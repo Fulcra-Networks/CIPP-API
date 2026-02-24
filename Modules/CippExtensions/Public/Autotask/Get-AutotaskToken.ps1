@@ -8,7 +8,7 @@ function Get-AutotaskToken {
 
     if (!$ENV:AutotaskSecret) {
         $null = Connect-AzAccount -Identity
-        $ClientSecret = (Get-AzKeyVaultSecret -VaultName $ENV:WEBSITE_DEPLOYMENT_ID -Name 'Autotask' -AsPlainText)
+        $ClientSecret = (Get-CIPPKeyVaultSecret -VaultName $ENV:WEBSITE_DEPLOYMENT_ID -Name 'Autotask' -AsPlainText)
     } else {
         $ClientSecret = $ENV:AutotaskSecret
     }
