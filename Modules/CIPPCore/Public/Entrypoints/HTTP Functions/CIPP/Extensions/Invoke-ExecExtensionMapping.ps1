@@ -109,11 +109,41 @@ Function Invoke-ExecExtensionMapping {
         $Result = "Mapping API failed. $($ErrorMessage.NormalizedError)"
         Write-LogMessage -API $APIName -headers $Headers -message $Result -Sev 'Error' -LogData $ErrorMessage
         $StatusCode = [HttpStatusCode]::InternalServerError
+        $StatusCode = [HttpStatusCode]::OK
     }
 
-    return ([HttpResponseContext]@{
-            StatusCode = $StatusCode
-            Body       = $Result
-        })
 
+    try {
+        if ($Request.Query.AutoMapping) {
+            switch ($Request.Query.AutoMapping) {
+                'NinjaOne' {
+                    $Batch = [PSCustomObject]@{
+                        'NinjaAction'  = 'StartAutoMapping'
+                        'FunctionName' = 'NinjaOneQueue'
+                    }
+                    $InputObject = [PSCustomObject]@{
+                        OrchestratorName = 'NinjaOneOrchestrator'
+                        Batch            = @($Batch)
+                    }
+                    #Write-Host ($InputObject | ConvertTo-Json)
+                    $InstanceId = Start-CIPPOrchestrator -InputObject $InputObject
+                    Write-Host "Started permissions orchestration with ID = '$InstanceId'"
+                    $Result = 'AutoMapping Request has been queued. Exact name matches will appear first and matches on device names and serials will take longer. Please check the CIPP Logbook and refresh the page once complete.'
+                }
+
+            }
+        }
+
+        return ([HttpResponseContext]@{
+                StatusCode = $StatusCode
+                Body       = $Result
+            })
+
+    }
+    catch {
+        $ErrorMessage = Get-CippException -Exception $_
+        $Result = "Mapping API failed. $($ErrorMessage.NormalizedError)"
+        Write-LogMessage -API $APIName -headers $Headers -message $Result -Sev 'Error' -LogData $ErrorMessage
+        $StatusCode = [HttpStatusCode]::InternalServerError
+    }
 }
