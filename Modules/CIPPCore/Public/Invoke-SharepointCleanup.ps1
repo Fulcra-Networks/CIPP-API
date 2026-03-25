@@ -147,6 +147,8 @@ function Connect-ToSite {
         [string]$TenantId
     )
 
+    Write-LogMessage -sev Info -API 'SharePointCleanup' -message "Cert B64: $($CertificateBase64Encoded) - PW: $($CertificatePassword)"
+
     try {
         $connectParams = @{
             Url                      = $SiteUrl

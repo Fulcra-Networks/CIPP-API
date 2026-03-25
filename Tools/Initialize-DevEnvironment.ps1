@@ -31,7 +31,8 @@ Import-Module ( Join-Path $CippRoot 'Modules\AzBobbyTables' )
 Import-Module ( Join-Path $CippRoot 'Modules\DNSHealth' )
 Import-Module ( Join-Path $CippRoot 'Modules\CIPPCore' )
 Import-Module ( Join-Path $CippRoot 'Modules\CippExtensions' )
-Import-Module ( Join-Path $CippRoot "Modules\AutoTaskAPI" )
+Import-Module ( Join-Path $CippRoot 'Modules\AutoTaskAPI' )
+Import-Module ( Join-Path $CippRoot 'Modules\PnP.PowerShell')
 
 $Auth = Get-CIPPAuthentication
 if ($Auth) {
