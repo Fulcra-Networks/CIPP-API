@@ -49,12 +49,12 @@ function Invoke-SharepointCleanup {
         return
     }
 
-    try {
-         $spoCertPw = Get-CippKeyVaultSecret -Name "SpoCertPw" -AsPlainText
-    } catch {
-        Write-LogMessage -sev Error -API 'SharePointCleanup' -message "Failed to retrieve certificate password from KeyVault for tenant: $tenantId - $($_.Exception.Message)"
-        return
-    }
+    # try {
+    #      $spoCertPw = Get-CippKeyVaultSecret -Name "SpoCertPw" -AsPlainText
+    # } catch {
+    #     Write-LogMessage -sev Error -API 'SharePointCleanup' -message "Failed to retrieve certificate password from KeyVault for tenant: $tenantId - $($_.Exception.Message)"
+    #     return
+    # }
 
     if ([string]::IsNullOrWhiteSpace($certBase64)) {
         Write-LogMessage -sev Error -API 'SharePointCleanup' -message "App certificate retrieved from KeyVault is empty for tenant: $tenantId"
@@ -73,7 +73,7 @@ function Invoke-SharepointCleanup {
     $totalFilesFound = 0
     $totalFilesDeleted = 0
     foreach ($site in $siteList) {
-        $connected = Connect-ToSite -SiteUrl $site -AppID $AppID -CertificateBase64Encoded $certBase64 -CertificatePassword $spoCertPw -TenantId $tenantId
+        $connected = Connect-ToSite -SiteUrl $site -AppID $AppID -CertificateBase64Encoded $certBase64 -TenantId $tenantId
         if (-not $connected) {
             Write-LogMessage -sev Warning -API 'SharePointCleanup' -message "Skipping site: $site - connection failed"
             continue
@@ -146,8 +146,6 @@ function Connect-ToSite {
         [Parameter(Mandatory = $true)]
         [string]$TenantId
     )
-
-    Write-LogMessage -sev Info -API 'SharePointCleanup' -message "Cert B64: $($CertificateBase64Encoded) - PW: $($CertificatePassword)"
 
     try {
         $connectParams = @{
