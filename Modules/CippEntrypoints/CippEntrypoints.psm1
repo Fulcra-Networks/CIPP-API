@@ -176,7 +176,7 @@ function Receive-CippQueueTrigger {
     param($QueueItem, $TriggerMetadata)
 
     Write-Information '####### Starting CIPP Queue Trigger'
-    Write-Information "QueueItem: $($QueueItem | ConvertTo-Json -Depth 10 -Compress)"
+    $QueueItem = $QueueItem | ConvertTo-Json -Depth 10 | ConvertFrom-Json
     Set-Location (Get-Item $PSScriptRoot).Parent.Parent.FullName
 
     if (Get-Command -Name $QueueItem.Cmdlet -Module CIPPCore -ErrorAction SilentlyContinue) {
@@ -255,14 +255,20 @@ function Receive-CippOrchestrationTrigger {
         Write-Information "Durable Mode: $DurableMode"
 
         $RetryOptions = New-DurableRetryOptions @DurableRetryOptions
-        if (!$OrchestratorInput.Batch -or ($OrchestratorInput.Batch | Measure-Object).Count -eq 0 -and $OrchestratorInput.QueueFunction) {
-            $Batch = (Invoke-ActivityFunction -FunctionName 'CIPPActivityFunction' -Input $OrchestratorInput.QueueFunction -ErrorAction Stop) | Where-Object { $null -ne $_.FunctionName }
-        } elseif ($OrchestratorInput.Batch) {
+
+        $HasBatch = $OrchestratorInput.Batch -and @($OrchestratorInput.Batch).Count -gt 0
+        $HasQueueFunction = $null -ne $OrchestratorInput.QueueFunction -and $OrchestratorInput.QueueFunction -ne ''
+
+        if ($HasBatch) {
             $Batch = $OrchestratorInput.Batch | Where-Object { $null -ne $_.FunctionName }
+        } elseif ($HasQueueFunction) {
+            $Batch = (Invoke-ActivityFunction -FunctionName 'CIPPActivityFunction' -Input $OrchestratorInput.QueueFunction -ErrorAction Stop) | Where-Object { $null -ne $_.FunctionName }
         } else {
             Write-Information 'No batch or queue function provided to orchestrator input'
             $Batch = @()
         }
+
+        $Batch = @($Batch | Where-Object { $null -ne $_.FunctionName })
 
         if (($Batch | Measure-Object).Count -gt 0) {
             Write-Information "Batch Count: $($Batch.Count)"
@@ -301,6 +307,9 @@ function Receive-CippOrchestrationTrigger {
             } else {
                 $Results = $Output
             }
+        } else {
+            Write-Information 'No activities to execute in batch'
+            $Results = @()
         }
 
         if ($Results -and $OrchestratorInput.PostExecution) {
@@ -477,6 +486,7 @@ function Receive-CIPPTimerTrigger {
     param($Timer)
 
     $UtcNow = (Get-Date).ToUniversalTime()
+
     $Functions = Get-CIPPTimerFunctions
     $Table = Get-CIPPTable -tablename CIPPTimers
     $Statuses = Get-CIPPAzDataTableEntity @Table
@@ -537,7 +547,7 @@ function Receive-CIPPTimerTrigger {
 
             # Wrap the timer function execution with telemetry
 
-            Invoke-Command -ScriptBlock { & $Function.Command @Parameters }
+            $Results = Invoke-Command -ScriptBlock { & $Function.Command @Parameters }
 
 
             if ($Results -match '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$') {

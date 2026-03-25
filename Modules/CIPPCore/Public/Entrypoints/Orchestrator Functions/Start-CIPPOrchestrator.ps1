@@ -37,7 +37,10 @@ function Start-CIPPOrchestrator {
 
     # If already running in processor context (e.g., timer trigger) and we have an InputObject,
     # start orchestration directly without queuing
-    if ($InputObject -and ($env:CIPP_PROCESSOR -eq 'true' -or $CallerIsQueueTrigger.IsPresent)) {
+
+    $OrchestratorTriggerDisabled = $env:AzureWebJobs_CIPPOrchestrator_Disabled -in @('true', '1') -or [System.Environment]::GetEnvironmentVariable('AzureWebJobs.CIPPOrchestrator.Disabled') -in @('true', '1')
+
+    if ($InputObject -and -not $OrchestratorTriggerDisabled) {
         Write-Information 'Running in processor context - starting orchestration directly'
         try {
             $InstanceId = Start-NewOrchestration -FunctionName 'CIPPOrchestrator' -InputObject ($InputObject | ConvertTo-Json -Depth 10 -Compress)
@@ -67,8 +70,8 @@ function Start-CIPPOrchestrator {
 
             # Clean up the stored input object after starting the orchestration
             try {
-                $Entities = Get-AzDataTableEntity @OrchestratorTable -Filter "PartitionKey eq 'Input' and (RowKey eq '$InputObjectGuid' or OriginalEntityId eq '$InputObjectGuid')" -Property 'PartitionKey', 'RowKey', 'ETag'
-                Remove-AzDataTableEntity @OrchestratorTable -Entity $Entities
+                $Entities = Get-AzDataTableEntity @OrchestratorTable -Filter "PartitionKey eq 'Input' and (RowKey eq '$InputObjectGuid' or OriginalEntityId eq '$InputObjectGuid')" -Property PartitionKey, RowKey
+                Remove-AzDataTableEntity @OrchestratorTable -Entity $Entities -Force
                 Write-Information "Cleaned up stored input object: $InputObjectGuid"
             } catch {
                 Write-Warning "Failed to clean up stored input object $InputObjectGuid : $_"

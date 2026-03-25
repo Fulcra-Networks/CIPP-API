@@ -27,3 +27,4 @@ CLAUDE.md
 # Ignore all root PowerShell files except profile.ps1
 /*.ps1
 !/profile.ps1
+.DS_Store

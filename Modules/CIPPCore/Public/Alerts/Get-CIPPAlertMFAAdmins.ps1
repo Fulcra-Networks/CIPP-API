@@ -18,12 +18,12 @@ function Get-CIPPAlertMFAAdmins {
             }
         }
         if (!$DuoActive) {
-            $MFAReport = try { Get-CIPPMFAStateReport -TenantFilter $TenantFilter } catch { $null }
+            $MFAReport = try { Get-CIPPMFAStateReport -TenantFilter $TenantFilter | Where-Object { $_.DisplayName -ne 'On-Premises Directory Synchronization Service Account' } } catch { $null }
             $IncludeDisabled = [System.Convert]::ToBoolean($InputValue)
 
             # Check 1: Admins with no MFA registered — prefer cache, fall back to live Graph
             $Users = if ($MFAReport) {
-                $MFAReport | Where-Object { $_.IsAdmin -eq $true -and $_.MFARegistration -eq $false -and ($IncludeDisabled -or $_.AccountEnabled -eq $true) }
+                $MFAReport | Where-Object { $_.IsAdmin -eq $true -and $_.MFARegistration -eq $false -and $_.UserType -ne 'Guest' -and ($IncludeDisabled -or $_.AccountEnabled -eq $true) }
             } else {
                 New-GraphGETRequest -uri "https://graph.microsoft.com/beta/reports/authenticationMethods/userRegistrationDetails?`$top=999&filter=IsAdmin eq true and isMfaRegistered eq false and userType eq 'member'&`$select=id,userDisplayName,userPrincipalName,lastUpdatedDateTime,isMfaRegistered,IsAdmin" -tenantid $($TenantFilter) -AsApp $true |
                     Where-Object { $_.userDisplayName -ne 'On-Premises Directory Synchronization Service Account' } |
@@ -35,6 +35,7 @@ function Get-CIPPAlertMFAAdmins {
             $UnenforcedAdmins = $MFAReport | Where-Object {
                 $_.IsAdmin -eq $true -and
                 $_.MFARegistration -eq $true -and
+                $_.UserType -ne 'Guest' -and
                 ($IncludeDisabled -or $_.AccountEnabled -eq $true) -and
                 $_.PerUser -notin @('Enforced', 'Enabled') -and
                 $null -ne $_.CoveredBySD -and
@@ -50,6 +51,7 @@ function Get-CIPPAlertMFAAdmins {
                 $Users = $Users | Where-Object { $_.ID -notin $JITAdminIds }
                 $UnenforcedAdmins = $UnenforcedAdmins | Where-Object { $_.ID -notin $JITAdminIds }
             }
+
 
             $AlertData = [System.Collections.Generic.List[PSCustomObject]]::new()
 
