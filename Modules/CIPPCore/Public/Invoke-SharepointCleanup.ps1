@@ -138,14 +138,26 @@ function Connect-ToSite {
         [string]$AppID,
 
         [Parameter(Mandatory = $true)]
-        [System.Security.Cryptography.X509Certificates.X509Certificate2]$Certificate,
+        [string]$CertificateBase64Encoded,
+
+        [Parameter(Mandatory = $false)]
+        [string]$CertificatePassword,
 
         [Parameter(Mandatory = $true)]
         [string]$TenantId
     )
 
     try {
-        Connect-PnPOnline -Url $SiteUrl -ClientId $AppID -Certificate $Certificate -Tenant $TenantId
+        $connectParams = @{
+            Url                      = $SiteUrl
+            ClientId                 = $AppID
+            CertificateBase64Encoded = $CertificateBase64Encoded
+            Tenant                   = $TenantId
+        }
+        if (-not [string]::IsNullOrWhiteSpace($CertificatePassword)) {
+            $connectParams['CertificatePassword'] = (ConvertTo-SecureString -String $CertificatePassword -AsPlainText -Force)
+        }
+        Connect-PnPOnline @connectParams
         Write-LogMessage -sev Info -API 'SharePointCleanup' -message "Connected to: $SiteUrl"
         return $true
     }
