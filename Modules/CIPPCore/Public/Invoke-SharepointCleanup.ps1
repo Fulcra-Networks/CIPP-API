@@ -37,6 +37,8 @@ function Invoke-SharepointCleanup {
     $spoBaseURI = $TenantConfig.spoBaseUri
     $spoAdminUri = $TenantConfig.spoAdminUri
 
+    $spoCertPw = ""
+
     Write-LogMessage -sev Info -API 'SharePointCleanup' -message "Loaded config for tenant $tenantId - AppID: $AppID, Base URI: $spoBaseURI"
 
     # Step 2: Get the App Certificate from KeyVault (stored as a secret containing the base64-encoded PFX)
@@ -47,24 +49,31 @@ function Invoke-SharepointCleanup {
         return
     }
 
+    try {
+         $spoCertPw = Get-CippKeyVaultSecret -Name "SpoCertPw" -AsPlainText
+    } catch {
+        Write-LogMessage -sev Error -API 'SharePointCleanup' -message "Failed to retrieve certificate password from KeyVault for tenant: $tenantId - $($_.Exception.Message)"
+        return
+    }
+
     if ([string]::IsNullOrWhiteSpace($certBase64)) {
         Write-LogMessage -sev Error -API 'SharePointCleanup' -message "App certificate retrieved from KeyVault is empty for tenant: $tenantId"
         return
     }
 
-    try {
-        $certBytes = [Convert]::FromBase64String($certBase64)
-        $AppCertificate = [System.Security.Cryptography.X509Certificates.X509Certificate2]::new($certBytes)
-    } catch {
-        Write-LogMessage -sev Error -API 'SharePointCleanup' -message "Failed to convert certificate from base64 for tenant: $tenantId - $($_.Exception.Message)"
-        return
-    }
+    # try {
+    #     $certBytes = [Convert]::FromBase64String($certBase64)
+    #     $AppCertificate = [System.Security.Cryptography.X509Certificates.X509Certificate2]::new($certBytes)
+    # } catch {
+    #     Write-LogMessage -sev Error -API 'SharePointCleanup' -message "Failed to convert certificate from base64 for tenant: $tenantId - $($_.Exception.Message)"
+    #     return
+    # }
 
     # Step 3: Iterate sites, connecting to each
     $totalFilesFound = 0
     $totalFilesDeleted = 0
     foreach ($site in $siteList) {
-        $connected = Connect-ToSite -SiteUrl $site -AppID $AppID -Certificate $AppCertificate -TenantId $tenantId
+        $connected = Connect-ToSite -SiteUrl $site -AppID $AppID -CertificateBase64Encoded $certBase64 -CertificatePassword $spoCertPw -TenantId $tenantId
         if (-not $connected) {
             Write-LogMessage -sev Warning -API 'SharePointCleanup' -message "Skipping site: $site - connection failed"
             continue
