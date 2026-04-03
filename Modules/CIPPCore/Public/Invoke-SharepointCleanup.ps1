@@ -85,7 +85,7 @@ function Invoke-SharepointCleanup {
 
             # Step 4: Iterate file types, retrieving target files (pre-filtered by age server-side)
             $allTargetFiles = foreach ($ext in $fileTypes) {
-                Get-TargetFiles -fileExt $ext -lastModifiedDays $lastModifiedDays -minimumFileSizeBytes ($minimumFileSizeMB * 1048576)
+                Get-TargetFiles -fileExt $ext -lastModifiedDays $lastModifiedDays -minimumFileSizeBytes ($minimumFileSizeMB * 1048576) -siteUrl $site
             }
 
             if ($null -eq $allTargetFiles -or $allTargetFiles.Count -eq 0) {
@@ -167,68 +167,54 @@ function Connect-ToSite {
 function Get-TargetFiles {
     <#
     .SYNOPSIS
-        Searches the current site for files matching the given extension.
+        Searches a site for files matching the given extension using SharePoint Search API.
     .DESCRIPTION
-        Recursively searches all document libraries in the connected site
-        for files with the specified extension.
+        Uses Invoke-PnPSearchQuery to find files, bypassing the list view threshold
+        that affects CAML queries on large libraries (>5000 items).
     .OUTPUTS
         Array of file objects.
     #>
-    param($fileExt, [int]$lastModifiedDays, [long]$minimumFileSizeBytes = 104857600)
+    param($fileExt, [int]$lastModifiedDays, [long]$minimumFileSizeBytes = 104857600, [string]$siteUrl)
 
-    # Get all document libraries
-    try {
-        $lists = Get-PnPList | Where-Object { $_.BaseTemplate -eq 101 }
-    } catch {
-        Write-LogMessage -sev Error -API 'SharePointCleanup' -message "Failed to retrieve document libraries: $($_.Exception.Message)"
-        return @()
-    }
+    $cutoffDate = [datetime]::UtcNow.AddDays(-$lastModifiedDays).ToString('yyyy-MM-ddTHH:mm:ssZ')
+    $minimumFileSizeKB = [math]::Floor($minimumFileSizeBytes / 1024)
+    $kqlQuery = "path:""$siteUrl"" AND filetype:$fileExt AND size>$minimumFileSizeKB AND write<""$cutoffDate"""
 
-    $targetFiles = foreach ($list in $lists) {
+    Write-LogMessage -sev Info -API 'SharePointCleanup' -message "Search query: $kqlQuery"
+
+    $targetFiles = @()
+    $startRow = 0
+    $pageSize = 500
+
+    do {
         try {
-            $cutoffDate = [datetime]::UtcNow.AddDays(-$lastModifiedDays).ToString('yyyy-MM-ddTHH:mm:ssZ')
-            $camlQuery = @"
-<View Scope='RecursiveAll'>
-    <Query>
-        <Where>
-            <And>
-                <And>
-                    <Eq><FieldRef Name='File_x0020_Type'/><Value Type='Text'>$fileExt</Value></Eq>
-                    <Lt><FieldRef Name='Modified'/><Value Type='DateTime' IncludeTimeValue='TRUE'>$cutoffDate</Value></Lt>
-                </And>
-                <Gt><FieldRef Name='File_x0020_Size'/><Value Type='Number'>$minimumFileSizeBytes</Value></Gt>
-            </And>
-        </Where>
-    </Query>
-    <ViewFields>
-        <FieldRef Name='FileLeafRef'/>
-        <FieldRef Name='FileRef'/>
-        <FieldRef Name='File_x0020_Size'/>
-        <FieldRef Name='Modified'/>
-        <FieldRef Name='_ComplianceTag'/>
-        <FieldRef Name='ID'/>
-    </ViewFields>
-    <RowLimit Paged='TRUE'>500</RowLimit>
-</View>
-"@
-            $files = Get-PnPListItem -List $list -Query $camlQuery -PageSize 500
+            $searchResults = Invoke-PnPSearchQuery -Query $kqlQuery -StartRow $startRow -MaxResults $pageSize -SelectProperties 'FileName','Path','Size','Write','ComplianceTag','SPWebUrl' -SortList @{Write = 'Ascending'}
         } catch {
-            Write-LogMessage -sev Warning -API 'SharePointCleanup' -message "Failed to enumerate library '$($list.Title)': $($_.Exception.Message)"
-            continue
+            Write-LogMessage -sev Error -API 'SharePointCleanup' -message "Search query failed at row $startRow`: $($_.Exception.Message)"
+            break
         }
 
-        foreach ($file in $files) {
-            [PSCustomObject]@{
-                FileName      = $file["FileLeafRef"]
-                FilePath      = $file["FileRef"]
-                FileSize      = $file["File_x0020_Size"]
-                Modified      = $file["Modified"]
-                Library       = $list.Title
-                ComplianceTag = $file["_ComplianceTag"]
-                Id            = $file.Id
+        if ($searchResults.ResultRows.Count -eq 0) { break }
+
+        foreach ($row in $searchResults.ResultRows) {
+            # Convert the full Path URL to a server-relative path
+            $fullPath = $row['Path']
+            $uri = [System.Uri]$fullPath
+            $serverRelativePath = $uri.AbsolutePath
+
+            $targetFiles += [PSCustomObject]@{
+                FileName      = $row['FileName']
+                FilePath      = $serverRelativePath
+                FileSize      = $row['Size']
+                Modified      = $row['Write']
+                Library       = ''
+                ComplianceTag = $row['ComplianceTag']
+                Id            = $null
             }
         }
-    }
+
+        $startRow += $pageSize
+    } while ($startRow -lt $searchResults.TotalRows)
 
     $fileCount = @($targetFiles).Count
     $top3 = @($targetFiles) | Sort-Object Modified -Descending | Select-Object -First 3
@@ -290,7 +276,7 @@ function Remove-FilesFound {
                 try {
                     $HistoryEntity = [PSCustomObject]@{
                         PartitionKey  = $tenantId
-                        RowKey        = (New-Guid).Guid
+                        RowKey        = "$([guid]::new)"
                         SiteUrl       = [string]$site
                         FileName      = [string]$file.FileName
                         FilePath      = [string]$file.FilePath
