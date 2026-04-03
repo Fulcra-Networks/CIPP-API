@@ -262,12 +262,10 @@ function Remove-FilesFound {
         # Throttle delay to avoid SharePoint request limits
         Start-Sleep -Milliseconds 650
         Write-LogMessage -sev Info -API 'SharePointCleanup' -message "Processing $count of $($targetFileList.count): $($file.FilePath)"
-        # Get the folder and file name from the file path
-        $folder = $file.FilePath.Replace("/$($file.FileName)", '')
 
         try {
-            # Make sure file exists at the path we supplied
-            if ($pnpFile = Find-PnPFile -Folder $folder -Match $file.FileName) {
+            # Verify file still exists - search index can return stale results
+            if ($pnpFile = Get-PnPFile -Url $file.FilePath -AsFileObject) {
                 Start-Sleep -Milliseconds 650
                 #Remove-PnPFile -ServerRelativeUrl $file.FilePath -Force
                 Write-LogMessage -sev Info -API 'SharePointCleanup' -message "Deleted $($file.FilePath)"
@@ -292,7 +290,7 @@ function Remove-FilesFound {
                     Write-LogMessage -sev Warning -API 'SharePointCleanup' -message "Failed to log deletion history for $($file.FilePath): $($_.Exception.Message)"
                 }
             } else {
-                Write-LogMessage -sev Warning -API 'SharePointCleanup' -message "File not found: $($file.FilePath)"
+                Write-LogMessage -sev Warning -API 'SharePointCleanup' -message "Stale search result - file not found: $($file.FilePath)"
             }
         } catch {
             Write-LogMessage -sev Error -API 'SharePointCleanup' -message "Error processing file $($file.FilePath): $($_.Exception.Message)"
