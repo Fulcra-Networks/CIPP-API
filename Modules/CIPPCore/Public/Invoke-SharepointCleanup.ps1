@@ -267,7 +267,7 @@ function Remove-FilesFound {
             # Verify file still exists - search index can return stale results
             if ($pnpFile = Get-PnPFile -Url $file.FilePath -AsFileObject) {
                 Start-Sleep -Milliseconds 650
-                #Remove-PnPFile -ServerRelativeUrl $file.FilePath -Force
+                Remove-PnPFile -ServerRelativeUrl $file.FilePath -Force
                 Write-LogMessage -sev Info -API 'SharePointCleanup' -message "Deleted $($file.FilePath)"
                 $deleted += 1
 
