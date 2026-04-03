@@ -178,7 +178,7 @@ function Get-TargetFiles {
 
     $cutoffDate = [datetime]::UtcNow.AddDays(-$lastModifiedDays).ToString('yyyy-MM-ddTHH:mm:ssZ')
     $minimumFileSizeKB = [math]::Floor($minimumFileSizeBytes / 1024)
-    $kqlQuery = "path:""$siteUrl"" AND IsDocument:true AND filetype:$fileExt AND size>$minimumFileSizeKB AND write<""$cutoffDate"""
+    $kqlQuery = "path:""$siteUrl"" AND filetype:$fileExt AND size>$minimumFileSizeKB AND write<""$cutoffDate"""
 
     Write-LogMessage -sev Info -API 'SharePointCleanup' -message "Search query: $kqlQuery"
 
@@ -188,7 +188,7 @@ function Get-TargetFiles {
 
     do {
         try {
-            $searchResults = Invoke-PnPSearchQuery -Query $kqlQuery -StartRow $startRow -MaxResults $pageSize -SelectProperties 'FileName','Path','Size','Write','ComplianceTag','SPWebUrl' -SortList @{Write = 'Ascending'}
+            $searchResults = Invoke-PnPSearchQuery -Query $kqlQuery -StartRow $startRow -MaxResults $pageSize -SelectProperties 'FileName','ParentLink','Size','Write','ComplianceTag','SPWebUrl' -SortList @{Write = 'Ascending'}
         } catch {
             Write-LogMessage -sev Error -API 'SharePointCleanup' -message "Search query failed at row $startRow`: $($_.Exception.Message)"
             break
@@ -197,10 +197,11 @@ function Get-TargetFiles {
         if ($searchResults.ResultRows.Count -eq 0) { break }
 
         foreach ($row in $searchResults.ResultRows) {
-            # Convert the full Path URL to a server-relative path
-            $fullPath = $row['Path']
-            $uri = [System.Uri]$fullPath
-            $serverRelativePath = [Uri]::UnescapeDataString($uri.AbsolutePath)
+            # Construct server-relative path from ParentLink + FileName
+            # Path/OriginalPath point to DispForm.aspx for non-document file types like .bak
+            $parentUri = [System.Uri]$row['ParentLink']
+            $parentPath = [Uri]::UnescapeDataString($parentUri.AbsolutePath)
+            $serverRelativePath = "$parentPath/$($row['FileName'])"
 
             $targetFiles += [PSCustomObject]@{
                 FileName      = $row['FileName']
