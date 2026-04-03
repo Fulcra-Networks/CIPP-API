@@ -187,14 +187,13 @@ function Get-TargetFiles {
     $targetFiles = foreach ($list in $lists) {
         try {
             $cutoffDate = [datetime]::UtcNow.AddDays(-$lastModifiedDays).ToString('yyyy-MM-ddTHH:mm:ssZ')
+            # Only filter on Modified (indexed by default) to avoid list view threshold errors
+            # on large libraries (>5000 items). File type is filtered client-side below.
             $camlQuery = @"
 <View Scope='RecursiveAll'>
     <Query>
         <Where>
-            <And>
-                <Eq><FieldRef Name='File_x0020_Type'/><Value Type='Text'>$fileExt</Value></Eq>
-                <Lt><FieldRef Name='Modified'/><Value Type='DateTime' IncludeTimeValue='TRUE'>$cutoffDate</Value></Lt>
-            </And>
+            <Lt><FieldRef Name='Modified'/><Value Type='DateTime' IncludeTimeValue='TRUE'>$cutoffDate</Value></Lt>
         </Where>
     </Query>
     <ViewFields>
@@ -214,7 +213,10 @@ function Get-TargetFiles {
             continue
         }
 
-        foreach ($file in $files) {
+        # Filter by file extension client-side to avoid threshold on non-indexed File_x0020_Type column
+        $filtered = $files | Where-Object { $_["FileLeafRef"] -like "*.$fileExt" }
+
+        foreach ($file in $filtered) {
             [PSCustomObject]@{
                 FileName      = $file["FileLeafRef"]
                 FilePath      = $file["FileRef"]
@@ -285,14 +287,14 @@ function Remove-FilesFound {
 
                 # Log to history table
                 try {
-                    $HistoryEntity = @{
+                    $HistoryEntity = [PSCustomObject]@{
                         PartitionKey  = $tenantId
                         RowKey        = (New-Guid).Guid
                         SiteUrl       = [string]$site
                         FileName      = [string]$file.FileName
                         FilePath      = [string]$file.FilePath
-                        FileSize      = [string]$file.FileSize
-                        FileModified  = [string]$file.Modified
+                        FileSize      = "$($file.FileSize)"
+                        FileModified  = "$($file.Modified)"
                         DeletedDate   = (Get-Date).ToUniversalTime().ToString('o')
                         Library       = [string]$file.Library
                         FileExtension = [System.IO.Path]::GetExtension($file.FileName)
