@@ -197,9 +197,17 @@ function Get-TargetFiles {
 
     $targetFiles = foreach ($list in $lists) {
         try {
-            $files = Get-PnPListItem -List $list -PageSize 1000 | Where-Object {
-                $_.FileSystemObjectType -eq "File" -and $_["FileLeafRef"] -like "*.$($fileExt)"
-            }
+            $camlQuery = @"
+<View Scope='RecursiveAll'>
+    <Query>
+        <Where>
+            <Eq><FieldRef Name='File_x0020_Type'/><Value Type='Text'>$fileExt</Value></Eq>
+        </Where>
+    </Query>
+    <RowLimit Paged='TRUE'>500</RowLimit>
+</View>
+"@
+            $files = Get-PnPListItem -List $list -Query $camlQuery -PageSize 500
         } catch {
             Write-LogMessage -sev Warning -API 'SharePointCleanup' -message "Failed to enumerate library '$($list.Title)': $($_.Exception.Message)"
             continue
