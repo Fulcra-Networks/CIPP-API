@@ -178,7 +178,7 @@ function Get-TargetFiles {
 
     $cutoffDate = [datetime]::UtcNow.AddDays(-$lastModifiedDays).ToString('yyyy-MM-ddTHH:mm:ssZ')
     $minimumFileSizeKB = [math]::Floor($minimumFileSizeBytes / 1024)
-    $kqlQuery = "path:""$siteUrl"" AND filetype:$fileExt AND size>$minimumFileSizeKB AND write<""$cutoffDate"""
+    $kqlQuery = "path:""$siteUrl"" AND IsDocument:true AND filetype:$fileExt AND size>$minimumFileSizeKB AND write<""$cutoffDate"""
 
     Write-LogMessage -sev Info -API 'SharePointCleanup' -message "Search query: $kqlQuery"
 
@@ -200,7 +200,7 @@ function Get-TargetFiles {
             # Convert the full Path URL to a server-relative path
             $fullPath = $row['Path']
             $uri = [System.Uri]$fullPath
-            $serverRelativePath = $uri.AbsolutePath
+            $serverRelativePath = [Uri]::UnescapeDataString($uri.AbsolutePath)
 
             $targetFiles += [PSCustomObject]@{
                 FileName      = $row['FileName']
@@ -284,7 +284,7 @@ function Remove-FilesFound {
                         FileModified  = "$($file.Modified)"
                         DeletedDate   = (Get-Date).ToUniversalTime().ToString('o')
                         Library       = [string]$file.Library
-                        FileExtension = [System.IO.Path]::GetExtension($file.FileName)
+                        FileExtension = "$([System.IO.Path]::GetExtension($file.FileName))"
                     }
                     Add-CIPPAzDataTableEntity @HistoryTable -Entity $HistoryEntity
                 } catch {
