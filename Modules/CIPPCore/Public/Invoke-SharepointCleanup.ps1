@@ -1,6 +1,6 @@
 function Invoke-SharepointCleanup {
     [CmdletBinding()]
-    param([string]$fileTypesCsv, [string]$siteUrlsCsv, [uint]$lastModifiedDays, $tenantId)
+    param([string]$fileTypesCsv, [string]$siteUrlsCsv, [uint]$lastModifiedDays, $tenantId, [uint]$minimumFileSizeMB = 100)
 
     if ($null -eq $tenantId) {
         Write-LogMessage -sev Error -API "SharePointCleanup" -message "Error no tenant specified."
@@ -85,7 +85,7 @@ function Invoke-SharepointCleanup {
 
             # Step 4: Iterate file types, retrieving target files (pre-filtered by age server-side)
             $allTargetFiles = foreach ($ext in $fileTypes) {
-                Get-TargetFiles -fileExt $ext -lastModifiedDays $lastModifiedDays
+                Get-TargetFiles -fileExt $ext -lastModifiedDays $lastModifiedDays -minimumFileSizeBytes ($minimumFileSizeMB * 1048576)
             }
 
             if ($null -eq $allTargetFiles -or $allTargetFiles.Count -eq 0) {
@@ -174,7 +174,7 @@ function Get-TargetFiles {
     .OUTPUTS
         Array of file objects.
     #>
-    param($fileExt, [int]$lastModifiedDays)
+    param($fileExt, [int]$lastModifiedDays, [long]$minimumFileSizeBytes = 104857600)
 
     # Get all document libraries
     try {
@@ -187,13 +187,17 @@ function Get-TargetFiles {
     $targetFiles = foreach ($list in $lists) {
         try {
             $cutoffDate = [datetime]::UtcNow.AddDays(-$lastModifiedDays).ToString('yyyy-MM-ddTHH:mm:ssZ')
-            # Only filter on Modified (indexed by default) to avoid list view threshold errors
-            # on large libraries (>5000 items). File type is filtered client-side below.
             $camlQuery = @"
 <View Scope='RecursiveAll'>
     <Query>
         <Where>
-            <Lt><FieldRef Name='Modified'/><Value Type='DateTime' IncludeTimeValue='TRUE'>$cutoffDate</Value></Lt>
+            <And>
+                <And>
+                    <Eq><FieldRef Name='File_x0020_Type'/><Value Type='Text'>$fileExt</Value></Eq>
+                    <Lt><FieldRef Name='Modified'/><Value Type='DateTime' IncludeTimeValue='TRUE'>$cutoffDate</Value></Lt>
+                </And>
+                <Gt><FieldRef Name='File_x0020_Size'/><Value Type='Number'>$minimumFileSizeBytes</Value></Gt>
+            </And>
         </Where>
     </Query>
     <ViewFields>
@@ -213,10 +217,7 @@ function Get-TargetFiles {
             continue
         }
 
-        # Filter by file extension client-side to avoid threshold on non-indexed File_x0020_Type column
-        $filtered = $files | Where-Object { $_["FileLeafRef"] -like "*.$fileExt" }
-
-        foreach ($file in $filtered) {
+        foreach ($file in $files) {
             [PSCustomObject]@{
                 FileName      = $file["FileLeafRef"]
                 FilePath      = $file["FileRef"]
