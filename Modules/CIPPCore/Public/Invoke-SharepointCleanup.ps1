@@ -83,9 +83,9 @@ function Invoke-SharepointCleanup {
                 continue
             }
 
-            # Step 4: Iterate file types, retrieving target files and combining lists
+            # Step 4: Iterate file types, retrieving target files (pre-filtered by age server-side)
             $allTargetFiles = foreach ($ext in $fileTypes) {
-                Get-TargetFiles -fileExt $ext
+                Get-TargetFiles -fileExt $ext -lastModifiedDays $lastModifiedDays
             }
 
             if ($null -eq $allTargetFiles -or $allTargetFiles.Count -eq 0) {
@@ -94,23 +94,12 @@ function Invoke-SharepointCleanup {
                 continue
             }
 
-            Write-LogMessage -sev Info -API 'SharePointCleanup' -message "Found $($allTargetFiles.Count) total target file(s) on site: $site"
+            Write-LogMessage -sev Info -API 'SharePointCleanup' -message "Found $($allTargetFiles.Count) file(s) older than $lastModifiedDays days on site: $site"
 
-            # Step 5: Filter files by age
-            $filteredFiles = Get-FilteredFilesByAge -fileList $allTargetFiles -days $lastModifiedDays
+            # Step 5: While connected, delete filtered file list
+            $siteDeleted = Remove-FilesInList -deleteFiles $allTargetFiles -site $site -spoBaseURI $spoBaseURI -tenantId $tenantId
 
-            if ($null -eq $filteredFiles -or $filteredFiles.Count -eq 0) {
-                Write-LogMessage -sev Info -API 'SharePointCleanup' -message "No files older than $lastModifiedDays days on site: $site"
-                Disconnect-PnPOnline
-                continue
-            }
-
-            Write-LogMessage -sev Info -API 'SharePointCleanup' -message "$($filteredFiles.Count) file(s) older than $lastModifiedDays days on site: $site"
-
-            # Step 6: While connected, delete filtered file list
-            $siteDeleted = Remove-FilesInList -deleteFiles $filteredFiles -site $site -spoBaseURI $spoBaseURI -tenantId $tenantId
-
-            $totalFilesFound += $filteredFiles.Count
+            $totalFilesFound += $allTargetFiles.Count
             $totalFilesDeleted += $siteDeleted
 
             Disconnect-PnPOnline
@@ -185,7 +174,7 @@ function Get-TargetFiles {
     .OUTPUTS
         Array of file objects.
     #>
-    param($fileExt) #Filter is *.fileExt
+    param($fileExt, [int]$lastModifiedDays)
 
     # Get all document libraries
     try {
@@ -197,13 +186,25 @@ function Get-TargetFiles {
 
     $targetFiles = foreach ($list in $lists) {
         try {
+            $cutoffDate = [datetime]::UtcNow.AddDays(-$lastModifiedDays).ToString('yyyy-MM-ddTHH:mm:ssZ')
             $camlQuery = @"
 <View Scope='RecursiveAll'>
     <Query>
         <Where>
-            <Eq><FieldRef Name='File_x0020_Type'/><Value Type='Text'>$fileExt</Value></Eq>
+            <And>
+                <Eq><FieldRef Name='File_x0020_Type'/><Value Type='Text'>$fileExt</Value></Eq>
+                <Lt><FieldRef Name='Modified'/><Value Type='DateTime' IncludeTimeValue='TRUE'>$cutoffDate</Value></Lt>
+            </And>
         </Where>
     </Query>
+    <ViewFields>
+        <FieldRef Name='FileLeafRef'/>
+        <FieldRef Name='FileRef'/>
+        <FieldRef Name='File_x0020_Size'/>
+        <FieldRef Name='Modified'/>
+        <FieldRef Name='_ComplianceTag'/>
+        <FieldRef Name='ID'/>
+    </ViewFields>
     <RowLimit Paged='TRUE'>500</RowLimit>
 </View>
 "@
@@ -226,7 +227,12 @@ function Get-TargetFiles {
         }
     }
 
-    Write-LogMessage -sev Info -API 'SharePointCleanup' -message "Found $(@($targetFiles).Count) .$fileExt file(s)"
+    $fileCount = @($targetFiles).Count
+    $top3 = @($targetFiles) | Sort-Object Modified -Descending | Select-Object -First 3
+    $top3Summary = ($top3 | ForEach-Object { "$($_.FileName) (Modified: $($_.Modified))" }) -join ', '
+    $cutoffUsed = [datetime]::UtcNow.AddDays(-$lastModifiedDays).ToString('yyyy-MM-dd HH:mm:ss')
+    Write-LogMessage -sev Info -API 'SharePointCleanup' -message "Found $fileCount .$fileExt file(s) older than $lastModifiedDays days (cutoff: $cutoffUsed). Most recent 3: $top3Summary"
+
     return $targetFiles
 }
 
@@ -282,13 +288,13 @@ function Remove-FilesFound {
                     $HistoryEntity = @{
                         PartitionKey  = $tenantId
                         RowKey        = (New-Guid).Guid
-                        SiteUrl       = $site
-                        FileName      = $file.FileName
-                        FilePath      = $file.FilePath
-                        FileSize      = $file.FileSize
-                        FileModified  = $file.Modified
+                        SiteUrl       = [string]$site
+                        FileName      = [string]$file.FileName
+                        FilePath      = [string]$file.FilePath
+                        FileSize      = [string]$file.FileSize
+                        FileModified  = [string]$file.Modified
                         DeletedDate   = (Get-Date).ToUniversalTime().ToString('o')
-                        Library       = $file.Library
+                        Library       = [string]$file.Library
                         FileExtension = [System.IO.Path]::GetExtension($file.FileName)
                     }
                     Add-CIPPAzDataTableEntity @HistoryTable -Entity $HistoryEntity
