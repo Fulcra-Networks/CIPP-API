@@ -15,6 +15,8 @@ function Invoke-SharepointCleanup {
     $fileTypes = $fileTypesCsv.Split(',').Trim()
     $siteList = $siteUrlsCsv.Split(',').Trim()
 
+    Write-LogMessage -sev Info -API 'SharePointCleanup' -message "Parsed $($siteList.Count) site(s): $($siteList -join ' | ')"
+
     if ($fileTypes.Length -lt 1) {
         Write-LogMessage -sev Error -API "SharePointCleanup" -message "Error no filetypes specified."
         return
@@ -73,43 +75,49 @@ function Invoke-SharepointCleanup {
     $totalFilesFound = 0
     $totalFilesDeleted = 0
     foreach ($site in $siteList) {
-        $connected = Connect-ToSite -SiteUrl $site -AppID $AppID -CertificateBase64Encoded $certBase64 -TenantId $tenantId
-        if (-not $connected) {
-            Write-LogMessage -sev Warning -API 'SharePointCleanup' -message "Skipping site: $site - connection failed"
-            continue
-        }
+        Write-LogMessage -sev Info -API 'SharePointCleanup' -message "Processing site $($siteList.IndexOf($site) + 1)/$($siteList.Count): $site"
+        try {
+            $connected = Connect-ToSite -SiteUrl $site -AppID $AppID -CertificateBase64Encoded $certBase64 -TenantId $tenantId
+            if (-not $connected) {
+                Write-LogMessage -sev Warning -API 'SharePointCleanup' -message "Skipping site: $site - connection failed"
+                continue
+            }
 
-        # Step 4: Iterate file types, retrieving target files and combining lists
-        $allTargetFiles = foreach ($ext in $fileTypes) {
-            Get-TargetFiles -fileExt $ext
-        }
+            # Step 4: Iterate file types, retrieving target files and combining lists
+            $allTargetFiles = foreach ($ext in $fileTypes) {
+                Get-TargetFiles -fileExt $ext
+            }
 
-        if ($null -eq $allTargetFiles -or $allTargetFiles.Count -eq 0) {
-            Write-LogMessage -sev Info -API 'SharePointCleanup' -message "No matching files found on site: $site"
+            if ($null -eq $allTargetFiles -or $allTargetFiles.Count -eq 0) {
+                Write-LogMessage -sev Info -API 'SharePointCleanup' -message "No matching files found on site: $site"
+                Disconnect-PnPOnline
+                continue
+            }
+
+            Write-LogMessage -sev Info -API 'SharePointCleanup' -message "Found $($allTargetFiles.Count) total target file(s) on site: $site"
+
+            # Step 5: Filter files by age
+            $filteredFiles = Get-FilteredFilesByAge -fileList $allTargetFiles -days $lastModifiedDays
+
+            if ($null -eq $filteredFiles -or $filteredFiles.Count -eq 0) {
+                Write-LogMessage -sev Info -API 'SharePointCleanup' -message "No files older than $lastModifiedDays days on site: $site"
+                Disconnect-PnPOnline
+                continue
+            }
+
+            Write-LogMessage -sev Info -API 'SharePointCleanup' -message "$($filteredFiles.Count) file(s) older than $lastModifiedDays days on site: $site"
+
+            # Step 6: While connected, delete filtered file list
+            $siteDeleted = Remove-FilesInList -deleteFiles $filteredFiles -site $site -spoBaseURI $spoBaseURI -tenantId $tenantId
+
+            $totalFilesFound += $filteredFiles.Count
+            $totalFilesDeleted += $siteDeleted
+
             Disconnect-PnPOnline
-            continue
+        } catch {
+            Write-LogMessage -sev Error -API 'SharePointCleanup' -message "Unhandled error processing site ${site}: $($_.Exception.Message)"
+            try { Disconnect-PnPOnline } catch {}
         }
-
-        Write-LogMessage -sev Info -API 'SharePointCleanup' -message "Found $($allTargetFiles.Count) total target file(s) on site: $site"
-
-        # Step 5: Filter files by age
-        $filteredFiles = Get-FilteredFilesByAge -fileList $allTargetFiles -days $lastModifiedDays
-
-        if ($null -eq $filteredFiles -or $filteredFiles.Count -eq 0) {
-            Write-LogMessage -sev Info -API 'SharePointCleanup' -message "No files older than $lastModifiedDays days on site: $site"
-            Disconnect-PnPOnline
-            continue
-        }
-
-        Write-LogMessage -sev Info -API 'SharePointCleanup' -message "$($filteredFiles.Count) file(s) older than $lastModifiedDays days on site: $site"
-
-        # Step 6: While connected, delete filtered file list
-        $siteDeleted = Remove-FilesInList -deleteFiles $filteredFiles -site $site -spoBaseURI $spoBaseURI -tenantId $tenantId
-
-        $totalFilesFound += $filteredFiles.Count
-        $totalFilesDeleted += $siteDeleted
-
-        Disconnect-PnPOnline
     }
 
     Write-LogMessage -sev Info -API 'SharePointCleanup' -message "SharePoint cleanup complete for tenant $tenantId - $totalFilesDeleted/$totalFilesFound eligible file(s) processed across $($siteList.Count) site(s)"
