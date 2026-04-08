@@ -49,7 +49,8 @@ function Invoke-SharepointCleanup {
     # Step 2: Get the App Certificate from KeyVault (stored as a secret containing the base64-encoded PFX)
     try {
         $certBase64 = Get-CippKeyVaultSecret -Name "SpoCleanupCert-$tenantId" -AsPlainText
-    } catch {
+    }
+    catch {
         $errMsg = "Failed to retrieve app certificate from KeyVault for tenant: $tenantId - $($_.Exception.Message)"
         Write-LogMessage -sev Error -API 'SharePointCleanup' -message $errMsg
         $errorMessages.Add($errMsg)
@@ -94,7 +95,7 @@ function Invoke-SharepointCleanup {
 
             # Step 4: Iterate file types, retrieving target files (pre-filtered by age server-side)
             $allTargetFiles = foreach ($ext in $fileTypes) {
-                Get-TargetFiles -fileExt $ext -lastModifiedDays $lastModifiedDays -minimumFileSizeBytes ($minimumFileSizeMB * 1048576) -siteUrl $site
+                Get-TargetFiles -fileExt $ext -lastModifiedDays $lastModifiedDays -minimumFileSizeBytes ($minimumFileSizeMB * 1048576) -siteUrl $site -errorMessages $errorMessages
             }
 
             if ($null -eq $allTargetFiles -or $allTargetFiles.Count -eq 0) {
@@ -112,7 +113,8 @@ function Invoke-SharepointCleanup {
             $totalFilesDeleted += $siteDeleted
 
             Disconnect-PnPOnline
-        } catch {
+        }
+        catch {
             $errMsg = "Unhandled error processing site ${site}: $($_.Exception.Message)"
             Write-LogMessage -sev Error -API 'SharePointCleanup' -message $errMsg
             $errorMessages.Add($errMsg)
@@ -190,7 +192,7 @@ function Get-TargetFiles {
     .OUTPUTS
         Array of file objects.
     #>
-    param($fileExt, [int]$lastModifiedDays, [long]$minimumFileSizeBytes = 104857600, [string]$siteUrl)
+    param($fileExt, [int]$lastModifiedDays, [long]$minimumFileSizeBytes = 104857600, [string]$siteUrl, [System.Collections.Generic.List[string]]$errorMessages)
 
     $cutoffDate = [datetime]::UtcNow.AddDays(-$lastModifiedDays).ToString('yyyy-MM-ddTHH:mm:ssZ')
     $minimumFileSizeKB = [math]::Floor($minimumFileSizeBytes / 1024)
@@ -204,9 +206,12 @@ function Get-TargetFiles {
 
     do {
         try {
-            $searchResults = Invoke-PnPSearchQuery -Query $kqlQuery -StartRow $startRow -MaxResults $pageSize -SelectProperties 'FileName','ParentLink','Size','Write','ComplianceTag','SPWebUrl' -SortList @{Write = 'Ascending'}
-        } catch {
-            Write-LogMessage -sev Error -API 'SharePointCleanup' -message "Search query failed at row $startRow`: $($_.Exception.Message)"
+            $searchResults = Invoke-PnPSearchQuery -Query $kqlQuery -StartRow $startRow -MaxResults $pageSize -SelectProperties 'FileName', 'ParentLink', 'Size', 'Write', 'ComplianceTag', 'SPWebUrl' -SortList @{Write = 'Ascending' }
+        }
+        catch {
+            $errMsg = "Search query failed for $siteUrl (filetype: $fileExt) at row $startRow`: $($_.Exception.Message)"
+            Write-LogMessage -sev Error -API 'SharePointCleanup' -message $errMsg
+            if ($errorMessages) { $errorMessages.Add($errMsg) }
             break
         }
 
@@ -302,15 +307,25 @@ function Remove-FilesFound {
                         FileExtension = "$([System.IO.Path]::GetExtension($file.FileName))"
                     }
                     Add-CIPPAzDataTableEntity @HistoryTable -Entity $HistoryEntity
-                } catch {
+                }
+                catch {
                     Write-LogMessage -sev Warning -API 'SharePointCleanup' -message "Failed to log deletion history for $($file.FilePath): $($_.Exception.Message)"
                 }
-            } else {
+            }
+            else {
                 Write-LogMessage -sev Warning -API 'SharePointCleanup' -message "Stale search result - file not found: $($file.FilePath)"
             }
-        } catch {
-            $errMsg = "Error processing file $($file.FilePath) on site ${site}: $($_.Exception.Message)"
-            Write-LogMessage -sev Warning -API 'SharePointCleanup' -message $errMsg
+        }
+        catch {
+            if ($_.Exception.Message -like "File Not Found.") {
+                $errMsg = "Warning processing file $($file.FilePath) on site ${site}: $($_.Exception.Message)"
+                Write-LogMessage -sev Warning -API 'SharePointCleanup' -message $errMsg
+            }
+            else {
+                $errMsg = "Error processing file $($file.FilePath) on site ${site}: $($_.Exception.Message)"
+                Write-LogMessage -sev Error -API 'SharePointCleanup' -message $errMsg
+                $errorMessages.Add($errMsg)
+            }
         }
         $count += 1
     }
@@ -333,7 +348,8 @@ function Submit-SharePointCleanupErrorTicket {
     try {
         $MappingTable = Get-CIPPTable -tablename 'CIPPMapping'
         $AutotaskMapping = Get-CIPPAzDataTableEntity @MappingTable -Filter "PartitionKey eq 'AutotaskMapping' and RowKey eq '$tenantId'"
-    } catch {
+    }
+    catch {
         Write-LogMessage -sev Error -API 'SharePointCleanup' -message "Failed to retrieve Autotask mapping for tenant $tenantId - cannot create error ticket: $($_.Exception.Message)"
         return
     }
@@ -359,7 +375,8 @@ function Submit-SharePointCleanupErrorTicket {
     try {
         $ExtTable = Get-CIPPTable -TableName Extensionsconfig
         $Configuration = (Get-CIPPAzDataTableEntity @ExtTable).config | ConvertFrom-Json -Depth 10 -ErrorAction SilentlyContinue
-    } catch {
+    }
+    catch {
         Write-LogMessage -sev Error -API 'SharePointCleanup' -message "Failed to load extensions config for Autotask ticket creation: $($_.Exception.Message)"
         return
     }
@@ -371,7 +388,8 @@ function Submit-SharePointCleanupErrorTicket {
 
     try {
         Get-AutotaskToken -configuration $Configuration.Autotask | Out-Null
-    } catch {
+    }
+    catch {
         Write-LogMessage -sev Error -API 'SharePointCleanup' -message "Failed to authenticate to Autotask API: $($_.Exception.Message)"
         return
     }
@@ -379,7 +397,8 @@ function Submit-SharePointCleanupErrorTicket {
     try {
         New-AutotaskTicket -atCompanyId $AutotaskMapping.IntegrationId -title $ticketTitle -description $ticketBody -issueType '29' -subIssueType '333'
         Write-LogMessage -sev Info -API 'SharePointCleanup' -message "Created Autotask ticket for $($errorMessages.Count) error(s) on tenant $tenantId"
-    } catch {
+    }
+    catch {
         Write-LogMessage -sev Error -API 'SharePointCleanup' -message "Failed to create Autotask error ticket: $($_.Exception.Message)"
     }
 }
