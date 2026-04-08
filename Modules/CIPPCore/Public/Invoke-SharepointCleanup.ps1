@@ -211,7 +211,7 @@ function Get-TargetFiles {
         catch {
             $errMsg = "Search query failed for $siteUrl (filetype: $fileExt) at row $startRow`: $($_.Exception.Message)"
             Write-LogMessage -sev Error -API 'SharePointCleanup' -message $errMsg
-            if ($errorMessages) { $errorMessages.Add($errMsg) }
+            if ($null -ne $errorMessages) { $errorMessages.Add($errMsg) }
             break
         }
 
