@@ -291,7 +291,7 @@ function Remove-FilesFound {
                 try {
                     $HistoryEntity = [PSCustomObject]@{
                         PartitionKey  = $tenantId
-                        RowKey        = "$([guid]::new)"
+                        RowKey        = "$([guid]::NewGuid())"
                         SiteUrl       = [string]$site
                         FileName      = [string]$file.FileName
                         FilePath      = [string]$file.FilePath
@@ -310,8 +310,7 @@ function Remove-FilesFound {
             }
         } catch {
             $errMsg = "Error processing file $($file.FilePath) on site ${site}: $($_.Exception.Message)"
-            Write-LogMessage -sev Error -API 'SharePointCleanup' -message $errMsg
-            $errorMessages.Add($errMsg)
+            Write-LogMessage -sev Warning -API 'SharePointCleanup' -message $errMsg
         }
         $count += 1
     }
@@ -354,6 +353,27 @@ function Submit-SharePointCleanupErrorTicket {
     foreach ($err in $errorMessages) {
         $ticketBody += "$errorIndex. $err`n"
         $errorIndex++
+    }
+
+    # Load extensions config and authenticate to Autotask API
+    try {
+        $ExtTable = Get-CIPPTable -TableName Extensionsconfig
+        $Configuration = (Get-CIPPAzDataTableEntity @ExtTable).config | ConvertFrom-Json -Depth 10 -ErrorAction SilentlyContinue
+    } catch {
+        Write-LogMessage -sev Error -API 'SharePointCleanup' -message "Failed to load extensions config for Autotask ticket creation: $($_.Exception.Message)"
+        return
+    }
+
+    if (-not $Configuration.Autotask.enabled) {
+        Write-LogMessage -sev Warning -API 'SharePointCleanup' -message "Autotask integration is not enabled - cannot create error ticket"
+        return
+    }
+
+    try {
+        Get-AutotaskToken -configuration $Configuration.Autotask | Out-Null
+    } catch {
+        Write-LogMessage -sev Error -API 'SharePointCleanup' -message "Failed to authenticate to Autotask API: $($_.Exception.Message)"
+        return
     }
 
     try {
