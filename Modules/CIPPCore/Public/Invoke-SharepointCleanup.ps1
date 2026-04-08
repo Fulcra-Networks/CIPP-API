@@ -389,7 +389,7 @@ function Submit-SharePointCleanupErrorTicket {
     try {
         # Set $Configuration in global scope so New-AutotaskTicket's internal Get-AutotaskToken call can resolve it
         $global:Configuration = $Configuration
-        New-AutotaskTicket -atCompanyId $AutotaskMapping.IntegrationId -title $ticketTitle -description $ticketBody -issueType '29' -subIssueType '333'
+        New-AutotaskTicket -atCompanyId $AutotaskMapping.IntegrationId -title $ticketTitle -description $ticketBody -issueType '29' -subIssueType '327'
         Write-LogMessage -sev Info -API 'SharePointCleanup' -message "Created Autotask ticket for $($errorMessages.Count) error(s) on tenant $tenantId"
     }
     catch {
