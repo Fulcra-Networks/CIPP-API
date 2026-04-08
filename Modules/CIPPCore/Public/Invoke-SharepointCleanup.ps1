@@ -2,6 +2,9 @@ function Invoke-SharepointCleanup {
     [CmdletBinding()]
     param([string]$fileTypesCsv, [string]$siteUrlsCsv, [uint]$lastModifiedDays, $tenantId, [uint]$minimumFileSizeMB = 100)
 
+    # Collect error messages for PSA ticket creation
+    $errorMessages = [System.Collections.Generic.List[string]]::new()
+
     if ($null -eq $tenantId) {
         Write-LogMessage -sev Error -API "SharePointCleanup" -message "Error no tenant specified."
         return
@@ -47,7 +50,10 @@ function Invoke-SharepointCleanup {
     try {
         $certBase64 = Get-CippKeyVaultSecret -Name "SpoCleanupCert-$tenantId" -AsPlainText
     } catch {
-        Write-LogMessage -sev Error -API 'SharePointCleanup' -message "Failed to retrieve app certificate from KeyVault for tenant: $tenantId - $($_.Exception.Message)"
+        $errMsg = "Failed to retrieve app certificate from KeyVault for tenant: $tenantId - $($_.Exception.Message)"
+        Write-LogMessage -sev Error -API 'SharePointCleanup' -message $errMsg
+        $errorMessages.Add($errMsg)
+        Submit-SharePointCleanupErrorTicket -tenantId $tenantId -errorMessages $errorMessages
         return
     }
 
@@ -59,7 +65,10 @@ function Invoke-SharepointCleanup {
     # }
 
     if ([string]::IsNullOrWhiteSpace($certBase64)) {
-        Write-LogMessage -sev Error -API 'SharePointCleanup' -message "App certificate retrieved from KeyVault is empty for tenant: $tenantId"
+        $errMsg = "App certificate retrieved from KeyVault is empty for tenant: $tenantId"
+        Write-LogMessage -sev Error -API 'SharePointCleanup' -message $errMsg
+        $errorMessages.Add($errMsg)
+        Submit-SharePointCleanupErrorTicket -tenantId $tenantId -errorMessages $errorMessages
         return
     }
 
@@ -97,19 +106,26 @@ function Invoke-SharepointCleanup {
             Write-LogMessage -sev Info -API 'SharePointCleanup' -message "Found $($allTargetFiles.Count) file(s) older than $lastModifiedDays days on site: $site"
 
             # Step 5: While connected, delete filtered file list
-            $siteDeleted = Remove-FilesInList -deleteFiles $allTargetFiles -site $site -spoBaseURI $spoBaseURI -tenantId $tenantId
+            $siteDeleted = Remove-FilesInList -deleteFiles $allTargetFiles -site $site -spoBaseURI $spoBaseURI -tenantId $tenantId -errorMessages $errorMessages
 
             $totalFilesFound += $allTargetFiles.Count
             $totalFilesDeleted += $siteDeleted
 
             Disconnect-PnPOnline
         } catch {
-            Write-LogMessage -sev Error -API 'SharePointCleanup' -message "Unhandled error processing site ${site}: $($_.Exception.Message)"
+            $errMsg = "Unhandled error processing site ${site}: $($_.Exception.Message)"
+            Write-LogMessage -sev Error -API 'SharePointCleanup' -message $errMsg
+            $errorMessages.Add($errMsg)
             try { Disconnect-PnPOnline } catch {}
         }
     }
 
     Write-LogMessage -sev Info -API 'SharePointCleanup' -message "SharePoint cleanup complete for tenant $tenantId - $totalFilesDeleted/$totalFilesFound eligible file(s) processed across $($siteList.Count) site(s)"
+
+    # If errors occurred during processing, create an Autotask ticket
+    if ($errorMessages.Count -gt 0) {
+        Submit-SharePointCleanupErrorTicket -tenantId $tenantId -errorMessages $errorMessages -totalFilesFound $totalFilesFound -totalFilesDeleted $totalFilesDeleted -siteCount $siteList.Count
+    }
 }
 
 function Connect-ToSite {
@@ -236,14 +252,14 @@ function Get-FilteredFilesByAge {
 # Should still be connected to site we retrieved files from at this call.
 # Returns the count of files successfully deleted.
 function Remove-FilesInList {
-    param($deleteFiles, $site, $spoBaseURI, $tenantId)
+    param($deleteFiles, $site, $spoBaseURI, $tenantId, [System.Collections.Generic.List[string]]$errorMessages)
     # Remove the base URI since we're doing a site-path search.
     $siteMatchString = $site.Replace($spoBaseURI, '')
 
     $siteFiles = $deleteFiles | Where-Object { $_.FilePath.startswith($siteMatchString) }
     Write-LogMessage -sev Info -API 'SharePointCleanup' -message "Got $($siteFiles.count) delete file(s) for site: $site"
     if ($siteFiles.Count -gt 0) {
-        return (Remove-FilesFound -targetFileList $siteFiles -site $site -tenantId $tenantId)
+        return (Remove-FilesFound -targetFileList $siteFiles -site $site -tenantId $tenantId -errorMessages $errorMessages)
     }
     else {
         Write-LogMessage -sev Info -API 'SharePointCleanup' -message "No files matched site path filter for $site (match string: $siteMatchString)"
@@ -252,7 +268,7 @@ function Remove-FilesInList {
 }
 
 function Remove-FilesFound {
-    param($targetFileList, $site, $tenantId)
+    param($targetFileList, $site, $tenantId, [System.Collections.Generic.List[string]]$errorMessages)
 
     $count = 0
     $deleted = 0
@@ -293,10 +309,57 @@ function Remove-FilesFound {
                 Write-LogMessage -sev Warning -API 'SharePointCleanup' -message "Stale search result - file not found: $($file.FilePath)"
             }
         } catch {
-            Write-LogMessage -sev Error -API 'SharePointCleanup' -message "Error processing file $($file.FilePath): $($_.Exception.Message)"
+            $errMsg = "Error processing file $($file.FilePath) on site ${site}: $($_.Exception.Message)"
+            Write-LogMessage -sev Error -API 'SharePointCleanup' -message $errMsg
+            $errorMessages.Add($errMsg)
         }
         $count += 1
     }
     Write-LogMessage -sev Info -API 'SharePointCleanup' -message "Deletion pass complete: $deleted/$($targetFileList.count) file(s) processed for site $site"
     return $deleted
+}
+
+function Submit-SharePointCleanupErrorTicket {
+    param(
+        [string]$tenantId,
+        [System.Collections.Generic.List[string]]$errorMessages,
+        [int]$totalFilesFound = 0,
+        [int]$totalFilesDeleted = 0,
+        [int]$siteCount = 0
+    )
+
+    if ($errorMessages.Count -eq 0) { return }
+
+    # Look up the Autotask company ID from the CIPP mapping table
+    try {
+        $MappingTable = Get-CIPPTable -tablename 'CIPPMapping'
+        $AutotaskMapping = Get-CIPPAzDataTableEntity @MappingTable -Filter "PartitionKey eq 'AutotaskMapping' and RowKey eq '$tenantId'"
+    } catch {
+        Write-LogMessage -sev Error -API 'SharePointCleanup' -message "Failed to retrieve Autotask mapping for tenant $tenantId - cannot create error ticket: $($_.Exception.Message)"
+        return
+    }
+
+    if ($null -eq $AutotaskMapping -or [string]::IsNullOrWhiteSpace($AutotaskMapping.IntegrationId)) {
+        Write-LogMessage -sev Warning -API 'SharePointCleanup' -message "No Autotask mapping found for tenant $tenantId - cannot create error ticket"
+        return
+    }
+
+    $ticketTitle = "SharePoint Cleanup Errors - $tenantId - $(Get-Date -Format 'yyyy-MM-dd')"
+    $ticketBody = "SharePoint Cleanup encountered $($errorMessages.Count) error(s) for tenant $tenantId on $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') UTC.`n`n"
+    if ($siteCount -gt 0) {
+        $ticketBody += "Summary: $totalFilesDeleted/$totalFilesFound file(s) processed across $siteCount site(s).`n`n"
+    }
+    $ticketBody += "Errors:`n"
+    $errorIndex = 1
+    foreach ($err in $errorMessages) {
+        $ticketBody += "$errorIndex. $err`n"
+        $errorIndex++
+    }
+
+    try {
+        New-AutotaskTicket -atCompanyId $AutotaskMapping.IntegrationId -title $ticketTitle -description $ticketBody -issueType '29' -subIssueType '333'
+        Write-LogMessage -sev Info -API 'SharePointCleanup' -message "Created Autotask ticket for $($errorMessages.Count) error(s) on tenant $tenantId"
+    } catch {
+        Write-LogMessage -sev Error -API 'SharePointCleanup' -message "Failed to create Autotask error ticket: $($_.Exception.Message)"
+    }
 }
