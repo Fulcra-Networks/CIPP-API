@@ -387,18 +387,15 @@ function Submit-SharePointCleanupErrorTicket {
     }
 
     try {
-        Get-AutotaskToken -configuration $Configuration.Autotask | Out-Null
-    }
-    catch {
-        Write-LogMessage -sev Error -API 'SharePointCleanup' -message "Failed to authenticate to Autotask API: $($_.Exception.Message)"
-        return
-    }
-
-    try {
+        # Set $Configuration in global scope so New-AutotaskTicket's internal Get-AutotaskToken call can resolve it
+        $global:Configuration = $Configuration
         New-AutotaskTicket -atCompanyId $AutotaskMapping.IntegrationId -title $ticketTitle -description $ticketBody -issueType '29' -subIssueType '333'
         Write-LogMessage -sev Info -API 'SharePointCleanup' -message "Created Autotask ticket for $($errorMessages.Count) error(s) on tenant $tenantId"
     }
     catch {
         Write-LogMessage -sev Error -API 'SharePointCleanup' -message "Failed to create Autotask error ticket: $($_.Exception.Message)"
+    }
+    finally {
+        Remove-Variable -Name Configuration -Scope Global -ErrorAction SilentlyContinue
     }
 }
