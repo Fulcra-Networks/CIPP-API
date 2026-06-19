@@ -44,6 +44,7 @@ function New-ExoBulkRequest {
             # Initialize the ID to Cmdlet Name mapping
             $IdToCmdletName = @{}
             $IdToOperationGuid = @{}  # Track operation GUIDs when provided
+            $IdToBatchRequest = @{}   # Original sub-requests, reused for nextLink continuations
 
             # Split the cmdletArray into batches of 10
             $batches = [System.Collections.Generic.List[object]]::new()
@@ -93,18 +94,62 @@ function New-ExoBulkRequest {
 
                     # Map the Request ID to the Cmdlet Name and Operation GUID (if provided)
                     $IdToCmdletName[$RequestId] = $cmd.CmdletInput.CmdletName
+                    $IdToBatchRequest[$RequestId] = $BatchRequest
                     if ($cmd.OperationGuid) {
                         $IdToOperationGuid[$RequestId] = $cmd.OperationGuid
                     }
                 }
                 $BatchBodyJson = ConvertTo-Json -InputObject $BatchBodyObj -Depth 10
                 $BatchBodyJson = Get-CIPPTextReplacement -TenantFilter $tenantid -Text $BatchBodyJson
-                $Results = Invoke-RestMethod $BatchURL -ResponseHeadersVariable responseHeaders -Method POST -Body $BatchBodyJson -Headers $Headers -ContentType 'application/json; charset=utf-8'
+                $Results = Invoke-CIPPRestMethod $BatchURL -ResponseHeadersVariable responseHeaders -Method POST -Body $BatchBodyJson -Headers $Headers -ContentType 'application/json; charset=utf-8'
                 foreach ($Response in $Results.responses) {
                     $ReturnedData.Add($Response)
                 }
 
                 Write-Host "Batch #$($batches.IndexOf($batch) + 1) of $($batches.Count) processed"
+            }
+
+            # Follow @odata.nextLink continuations so results are not capped at one page (mirrors New-GraphBulkRequest).
+            # The EXO admin API pages by re-POSTing the same CmdletInput body to the nextLink URL.
+            $IdToResponse = @{}
+            $NextLinkQueue = [System.Collections.Generic.Queue[object]]::new()
+            foreach ($Response in $ReturnedData) {
+                if ($Response.id -and -not $IdToResponse.ContainsKey($Response.id)) {
+                    $IdToResponse[$Response.id] = $Response
+                }
+                if ($Response.body.'@odata.nextLink' -and $IdToBatchRequest.ContainsKey($Response.id)) {
+                    $NextLinkQueue.Enqueue(@{ id = $Response.id; url = $Response.body.'@odata.nextLink' })
+                }
+            }
+
+            while ($NextLinkQueue.Count -gt 0) {
+                # Drain up to 10 nextLinks into a single $batch, same size as the main loop
+                $NextBatchRequests = [System.Collections.Generic.List[object]]::new()
+                while ($NextLinkQueue.Count -gt 0 -and $NextBatchRequests.Count -lt 10) {
+                    $Item = $NextLinkQueue.Dequeue()
+                    $ContinuationRequest = $IdToBatchRequest[$Item.id].Clone()
+                    $ContinuationRequest['url'] = $Item.url
+                    $NextBatchRequests.Add($ContinuationRequest)
+                }
+
+                Write-Host "Fetching next page for $($NextBatchRequests.Count) request(s)"
+                $NextBatchBodyJson = ConvertTo-Json -InputObject @{ requests = @($NextBatchRequests) } -Depth 10
+                $NextBatchBodyJson = Get-CIPPTextReplacement -TenantFilter $tenantid -Text $NextBatchBodyJson
+                $NextResults = Invoke-CIPPRestMethod $BatchURL -Method POST -Body $NextBatchBodyJson -Headers $Headers -ContentType 'application/json; charset=utf-8'
+
+                foreach ($NextResponse in $NextResults.responses) {
+                    $OriginalResponse = $IdToResponse[$NextResponse.id]
+                    if (-not $OriginalResponse) { continue }
+                    if ($NextResponse.body.value) {
+                        $MergedValues = [System.Collections.Generic.List[object]]::new()
+                        foreach ($val in @($OriginalResponse.body.value)) { $MergedValues.Add($val) }
+                        foreach ($val in @($NextResponse.body.value)) { $MergedValues.Add($val) }
+                        $OriginalResponse.body.value = $MergedValues
+                    }
+                    if ($NextResponse.body.'@odata.nextLink') {
+                        $NextLinkQueue.Enqueue(@{ id = $NextResponse.id; url = $NextResponse.body.'@odata.nextLink' })
+                    }
+                }
             }
         } catch {
             # Error handling (omitted for brevity)

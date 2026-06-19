@@ -44,7 +44,9 @@ function Write-LogMessage {
     if ($sev -eq 'Debug' -and $env:DebugMode -ne $true) {
         return
     }
-    $PartitionKey = (Get-Date -UFormat '%Y%m%d').ToString()
+    $TzId = if ($env:CIPP_TIMEZONE) { $env:CIPP_TIMEZONE } else { 'UTC' }
+    $LocalNow = [TimeZoneInfo]::ConvertTimeBySystemTimeZoneId([DateTime]::UtcNow, $TzId)
+    $PartitionKey = $LocalNow.ToString('yyyyMMdd')
     $TableRow = @{
         'Tenant'       = [string]$tenant
         'API'          = [string]$API
@@ -66,17 +68,18 @@ function Write-LogMessage {
     if ($tenantId) {
         $TableRow.Add('TenantID', [string]$tenantId)
     }
-    if ($script:CippStandardInfoStorage -and $script:CippStandardInfoStorage.Value) {
-        $TableRow.Standard = [string]$script:CippStandardInfoStorage.Value.Standard
-        $TableRow.StandardTemplateId = [string]$script:CippStandardInfoStorage.Value.StandardTemplateId
-        if ($script:CippStandardInfoStorage.Value.IntuneTemplateId) {
-            $TableRow.IntuneTemplateId = [string]$script:CippStandardInfoStorage.Value.IntuneTemplateId
+    $StandardInfo = $script:CippStandardInfoStorage.Value
+    if ($StandardInfo) {
+        $TableRow.Standard = [string]$StandardInfo.Standard
+        $TableRow.StandardTemplateId = [string]$StandardInfo.StandardTemplateId
+        if ($StandardInfo.IntuneTemplateId) {
+            $TableRow.IntuneTemplateId = [string]$StandardInfo.IntuneTemplateId
         }
-        if ($script:CippStandardInfoStorage.Value.ConditionalAccessTemplateId) {
-            $TableRow.ConditionalAccessTemplateId = [string]$script:CippStandardInfoStorage.Value.ConditionalAccessTemplateId
+        if ($StandardInfo.ConditionalAccessTemplateId) {
+            $TableRow.ConditionalAccessTemplateId = [string]$StandardInfo.ConditionalAccessTemplateId
         }
     }
-    if ($script:CippScheduledTaskIdStorage -and $script:CippScheduledTaskIdStorage.Value) {
+    if ($script:CippScheduledTaskIdStorage.Value) {
         $TableRow.ScheduledTaskId = [string]$script:CippScheduledTaskIdStorage.Value
     }
 

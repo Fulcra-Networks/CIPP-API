@@ -20,7 +20,7 @@ function New-CIPPDbRequest {
     #>
     [CmdletBinding()]
     param(
-        [Parameter(Mandatory = $true)]
+        [Parameter(Mandatory = $false)]
         [string]$TenantFilter,
 
         [Parameter(Mandatory = $false)]
@@ -28,12 +28,43 @@ function New-CIPPDbRequest {
     )
 
     try {
+        # Enforce tenant lock when running inside custom script execution
+        if ($script:CIPPLockedTenant) {
+            $TenantFilter = $script:CIPPLockedTenant
+        }
+
+        if ([string]::IsNullOrWhiteSpace($TenantFilter)) {
+            throw 'TenantFilter is required.'
+        }
+
         $Table = Get-CippTable -tablename 'CippReportingDB'
 
-        if ($Type) {
-            $Filter = "PartitionKey eq '{0}' and RowKey ge '{1}-' and RowKey lt '{1}.'" -f $TenantFilter, $Type
+        if (-not $script:CIPPDbRequestTenantCache) {
+            $script:CIPPDbRequestTenantCache = @{}
+        }
+        $CacheNow = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+        $CachedTenant = $script:CIPPDbRequestTenantCache[$TenantFilter]
+        if ($CachedTenant -and ($CacheNow - $CachedTenant.Timestamp) -lt 300) {
+            $Tenant = $CachedTenant.DefaultDomain
         } else {
-            $Filter = "PartitionKey eq '{0}'" -f $TenantFilter
+            $Tenant = (Get-Tenants -TenantFilter $TenantFilter).defaultDomainName
+            if ($Tenant) {
+                $script:CIPPDbRequestTenantCache[$TenantFilter] = @{ DefaultDomain = $Tenant; Timestamp = $CacheNow }
+            }
+        }
+        if (-not $Tenant) {
+            if ($TenantFilter -eq $env:TenantID) {
+                return $false
+            }
+            throw "Tenant '$TenantFilter' not found"
+        }
+        $SafeTenantFilter = ConvertTo-CIPPODataFilterValue -Value $Tenant -Type String
+        $SafeTypeFilter = if ($Type) { ConvertTo-CIPPODataFilterValue -Value $Type -Type String } else { $null }
+
+        if ($Type) {
+            $Filter = "PartitionKey eq '{0}' and RowKey ge '{1}-' and RowKey lt '{1}.'" -f $SafeTenantFilter, $SafeTypeFilter
+        } else {
+            $Filter = "PartitionKey eq '{0}'" -f $SafeTenantFilter
         }
 
         $Results = Get-CIPPAzDataTableEntity @Table -Filter $Filter

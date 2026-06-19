@@ -19,6 +19,16 @@ function Start-TableCleanup {
         @{
             FunctionName   = 'TableCleanupTask'
             Type           = 'CleanupRule'
+            TableName      = 'CippReportingDB'
+            DataTableProps = @{
+                Filter   = "Timestamp lt datetime'$((Get-Date).AddDays(-30).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ'))'"
+                First    = 10000
+                Property = @('PartitionKey', 'RowKey', 'ETag')
+            }
+        }
+        @{
+            FunctionName   = 'TableCleanupTask'
+            Type           = 'CleanupRule'
             TableName      = 'AuditLogSearches'
             DataTableProps = @{
                 Filter   = "PartitionKey eq 'Search' and Timestamp lt datetime'$((Get-Date).AddHours(-12).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ'))'"
@@ -86,6 +96,16 @@ function Start-TableCleanup {
             }
         }
         @{
+            FunctionName   = 'TableCleanupTask'
+            Type           = 'CleanupRule'
+            TableName      = 'CippOrchestratorBatch'
+            DataTableProps = @{
+                Filter   = "Timestamp lt datetime'$((Get-Date).AddHours(-24).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ'))'"
+                First    = 10000
+                Property = @('PartitionKey', 'RowKey', 'ETag')
+            }
+        }
+        @{
             FunctionName = 'TableCleanupTask'
             Type         = 'DeleteTable'
             Tables       = @('knownlocationdb', 'CacheExtensionSync', 'ExtensionSync')
@@ -98,5 +118,5 @@ function Start-TableCleanup {
         SkipLog          = $true
     }
 
-    Start-NewOrchestration -FunctionName 'CIPPOrchestrator' -InputObject ($InputObject | ConvertTo-Json -Depth 5 -Compress)
+    Start-CIPPOrchestrator -InputObject $InputObject
 }

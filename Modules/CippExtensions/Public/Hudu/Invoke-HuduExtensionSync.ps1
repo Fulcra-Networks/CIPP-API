@@ -33,8 +33,7 @@ function Invoke-HuduExtensionSync {
         $HuduAssetCache = Get-CippTable -tablename 'CacheHuduAssets'
 
         # Import license mapping
-        Set-Location (Get-Item $PSScriptRoot).Parent.Parent.Parent.Parent.FullName
-        $LicTable = Import-Csv ConversionTable.csv
+        $LicTable = [System.IO.File]::ReadAllText((Join-Path $env:CIPPRootPath 'Config\ConversionTable.csv')) | ConvertFrom-Csv
 
         $CompanyResult.Logs.Add('Starting Hudu Extension Sync')
 
@@ -67,7 +66,7 @@ function Invoke-HuduExtensionSync {
                 $PeopleLayout = Get-HuduAssetLayouts -Id $PeopleLayoutId
                 if ($PeopleLayout.id) {
                     $PeopleArray = Get-HuduAssets -CompanyId $company_id -AssetLayoutId $PeopleLayout.id
-                    $People = [System.Collections.Generic.List[object]]::new($PeopleArray)
+                    $People = [System.Collections.Generic.List[object]]::new([object[]]@($PeopleArray))
                 } else {
                     $CreateUsers = $false
                     $People = [System.Collections.Generic.List[object]]::new()
@@ -92,7 +91,7 @@ function Invoke-HuduExtensionSync {
                 $DesktopsLayout = Get-HuduAssetLayouts -Id $DeviceLayoutId
                 if ($DesktopsLayout.id) {
                     $HuduDesktopDevices = Get-HuduAssets -CompanyId $company_id -AssetLayoutId $DesktopsLayout.id
-                    $HuduDevices = [System.Collections.Generic.List[object]]::new($HuduDesktopDevices)
+                    $HuduDevices = [System.Collections.Generic.List[object]]::new([object[]]@($HuduDesktopDevices))
                 } else {
                     $CreateDevices = $false
                     $HuduDevices = [System.Collections.Generic.List[object]]::new()
@@ -122,7 +121,7 @@ function Invoke-HuduExtensionSync {
         }
 
         $HuduRelations = Get-HuduRelations
-        $Links = @(
+        [System.Collections.ArrayList]$Links = @(
             @{
                 Title = 'M365 Admin Portal'
                 URL   = 'https://admin.cloud.microsoft?delegatedOrg={0}' -f $Tenant.initialDomainName
@@ -154,6 +153,31 @@ function Invoke-HuduExtensionSync {
                 Icon  = 'fas fa-server'
             }
         )
+        if($Configuration.IncludeDefenderLink)
+        {
+            $Links.Add(@{
+                Title = 'Defender Portal'
+                URL   = 'https://security.microsoft.com/?tid={0}' -f $Tenant.customerId
+                Icon  = 'fas fa-shield'
+            })
+        }
+        if($Configuration.IncludeComplianceLink)
+        {
+            $Links.Add(@{
+                Title = 'Compliance Portal'
+                URL   = 'https://compliance.microsoft.com/?tid={0}' -f $Tenant.customerId
+                Icon  = 'fas fa-caret-up'
+            })
+        }
+        if($Configuration.IncludeParterCenterLink)
+        {
+            $Links.Add(@{
+                Title = 'Partner Center Portals'
+                URL   = 'https://partner.microsoft.com/dashboard/v2/customers/{0}/servicemanagementpage' -f $Tenant.customerId
+                Icon  = 'fas fa-arrow-up-right-from-square'
+            })
+        }
+
         $FormattedLinks = foreach ($Link in $Links) {
             Get-HuduLinkBlock @Link
         }
@@ -184,6 +208,11 @@ function Invoke-HuduExtensionSync {
 			 </header>"
 
         $post = '</div>'
+
+        if($Configuration.HideEmptyRoles) {
+            $Roles = $Roles | Where-Object { $_.ParsedMembers }
+        }
+
         $RolesHtml = $Roles | Select-Object DisplayName, Description, ParsedMembers | ConvertTo-Html -PreContent $pre -PostContent $post -Fragment | ForEach-Object { $tmp = $_ -replace '&lt;', '<'; $tmp -replace '&gt;', '>'; } | Out-String
 
         $AdminUsers = (($Roles | Where-Object { $_.displayName -match 'Administrator' }).Members | Where-Object { $null -ne $_.displayName } | Select-Object @{N = 'Name'; E = { "<a target='_blank' href='https://entra.microsoft.com/$($Tenant.defaultDomainName)/#blade/Microsoft_AAD_IAM/UserDetailsMenuBlade/Profile/userId/$($_.Id)'>$($_.displayName) - $($_.userPrincipalName)</a>" } } -Unique).name -join '<br/>'

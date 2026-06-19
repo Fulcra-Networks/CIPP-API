@@ -9,8 +9,9 @@ function Invoke-SharePointUsageCollection {
     )
 
     try {
+        $prevDay = [DateTime]::Now.AddDays(-1).ToString("yyyy-MM-dd")
         $UsageData = New-GraphGetRequest `
-            -uri "https://graph.microsoft.com/beta/reports/getSharePointSiteUsageDetail(period='D7')?`$format=application/json&`$top=999" `
+            -uri "https://graph.microsoft.com/beta/reports/getSharePointSiteUsageDetail(date='$($prevDay)')?`$format=application/json&`$top=999" `
             -tenantid $TenantFilter `
             -AsApp $true
 

@@ -5,11 +5,12 @@
 .DESCRIPTION
     Queries the Microsoft Graph beta endpoint for all Intune device management
     configuration setting definitions and writes the result to intuneCollection.json
-    in both the CIPP-API root and CIPP/src/data directories.
+    in both the CIPP-API Config directory (backend runtime) and the CIPP frontend
+    public/ directory (served as a static asset, fetched on demand by the UI).
 
-    The resulting file is used by Compare-CIPPIntuneObject.ps1 (backend) and
-    CippTemplateFieldRenderer.jsx / CippJSONView.jsx (frontend) to translate
-    raw settingDefinitionIds into human-readable display names.
+    The resulting file is used by Compare-CIPPIntuneObject.ps1 (backend) and the
+    frontend Intune setting renderers to translate raw settingDefinitionIds into
+    human-readable display names.
 
     Must be run from the "Tools" folder in the CIPP-API project, with
     Initialize-DevEnvironment.ps1 already dot-sourced (or it will be loaded
@@ -57,7 +58,7 @@ Write-Host "Total settings fetched: $($allSettings.Count)" -ForegroundColor Gree
 
 # ---------------------------------------------------------------------------
 # Transform to the shape expected by CIPP
-# Shape: [{ id, displayName, options: [{id, displayName, description}] | null }]
+# Shape: [{ id, displayName, description, helpText, infoUrls, options: [{id, displayName, description, helpText}] | null }]
 # ---------------------------------------------------------------------------
 Write-Host 'Transforming data...' -ForegroundColor Yellow
 
@@ -69,6 +70,7 @@ $collection = $allSettings | Sort-Object -Property id | ForEach-Object {
                 id          = $_.PSObject.Properties['itemId']?.Value
                 displayName = $_.PSObject.Properties['displayName']?.Value
                 description = $_.PSObject.Properties['description']?.Value
+                helpText    = $_.PSObject.Properties['helpText']?.Value
             }
         }
     } else {
@@ -78,6 +80,9 @@ $collection = $allSettings | Sort-Object -Property id | ForEach-Object {
     [PSCustomObject]@{
         id          = $_.id
         displayName = $_.displayName
+        description = $_.description
+        helpText    = $_.helpText
+        infoUrls    = $_.infoUrls
         options     = $options
     }
 }
@@ -87,21 +92,21 @@ $collection = $allSettings | Sort-Object -Property id | ForEach-Object {
 # ---------------------------------------------------------------------------
 Set-Location $PSScriptRoot
 
-$json = $collection | ConvertTo-Json -Depth 5
+$json = $collection | ConvertTo-Json -Depth 5 -Compress
 
-# CIPP-API root (used by Compare-CIPPIntuneObject.ps1 at runtime)
-$apiPath = Join-Path $PSScriptRoot '..\intuneCollection.json'
+# CIPP-API Config (used by Compare-CIPPIntuneObject.ps1 at runtime)
+$apiPath = Join-Path $PSScriptRoot '..\Config\intuneCollection.json'
 $json | Set-Content -Path $apiPath -Encoding utf8NoBOM
 Write-Host "Written: $(Resolve-Path $apiPath)" -ForegroundColor Green
 
-# CIPP frontend src/data (used by the React UI)
-$frontendPath = Join-Path $PSScriptRoot '..\..\CIPP\src\data\intuneCollection.json'
+# CIPP frontend public/ (served as a static asset, fetched on demand by the React UI)
+$frontendPath = Join-Path $PSScriptRoot '..\..\CIPP\public\intuneCollection.json'
 if (Test-Path (Split-Path $frontendPath)) {
     $json | Set-Content -Path $frontendPath -Encoding utf8NoBOM
     Write-Host "Written: $(Resolve-Path $frontendPath)" -ForegroundColor Green
 } else {
     Write-Host "CIPP frontend path not found — skipping: $frontendPath" -ForegroundColor Yellow
-    Write-Host "Copy $(Resolve-Path $apiPath) manually to your CIPP/src/data/ directory." -ForegroundColor Yellow
+    Write-Host "Copy $(Resolve-Path $apiPath) manually to your CIPP/public/ directory." -ForegroundColor Yellow
 }
 
 Write-Host "`nDone. $($collection.Count) settings written to intuneCollection.json." -ForegroundColor Green

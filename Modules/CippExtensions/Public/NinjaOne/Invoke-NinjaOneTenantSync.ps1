@@ -1669,7 +1669,7 @@ function Invoke-NinjaOneTenantSync {
                 'Tenant ID'      = $Customer.customerId
                 'Creation Date'  = $TenantDetails.createdDateTime
                 'Domains'        = $customerDomains
-                'Admin Users'    = ($AdminUsers | ForEach-Object { "$($_.DisplayName)" }) -join ', '
+                'Admin Users'    = ($AdminUsers | Select-Object -Property DisplayName -Unique | ForEach-Object { "$($_.DisplayName)" }) -join ', '
 
             }
 
@@ -1846,10 +1846,6 @@ function Invoke-NinjaOneTenantSync {
 
 
             ### CIPP Applied Standards Cards
-            $ModuleBase = Get-Module CIPPExtensions | Select-Object -ExpandProperty ModuleBase
-            $CIPPRoot = (Get-Item $ModuleBase).Parent.Parent.FullName
-            Set-Location $CIPPRoot
-
             try {
                 $StandardsDefinitions = Invoke-RestMethod -Uri 'https://raw.githubusercontent.com/KelvinTegelaar/CIPP/refs/heads/main/src/data/standards.json'
                 $AppliedStandards = Get-CIPPStandards -TenantFilter $Customer.defaultDomainName
