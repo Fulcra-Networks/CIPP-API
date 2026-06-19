@@ -36,7 +36,17 @@ function Invoke-ListAzureBillingMappings {
             }
         )
     }
-    $atContracts = Get-AutotaskAPIResource -Resource contracts -SearchQuery ($contractQuery | ConvertTo-Json -Depth 10 -Compress)
+    # Get-AutotaskAPIResource's -Resource is a *dynamic* parameter that only exists after
+    # Add-AutotaskAPIAuth (run inside Get-AutotaskCompanies above) authenticates to Autotask
+    # and downloads its entity list. If that auth fails, the dynamic param never registers and
+    # a direct call throws a cryptic binding error. Guard it so the page degrades gracefully.
+    try {
+        $atContracts = Get-AutotaskAPIResource -Resource contracts -SearchQuery ($contractQuery | ConvertTo-Json -Depth 10 -Compress)
+    } catch {
+        $Message = if ($_.ErrorDetails.Message) { Get-NormalizedError -Message $_.ErrorDetails.Message } else { $_.Exception.Message }
+        Write-LogMessage -Message "Could not get Autotask contracts, error: $Message" -sev Error -tenant 'CIPP' -API 'AutotaskMapping'
+        $atContracts = @()
+    }
 
     <#
     key=PartitionKey+RowKey of the mapping
