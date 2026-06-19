@@ -26,6 +26,10 @@ Your job is to implement, update, and review **alert-related functionality** in 
 
 You **must follow all constraints in this file** exactly.
 
+## Secondary Reference
+
+For detailed scaffolding patterns, parameter conventions, API call examples, and output standards, refer to `.github/instructions/alerts.instructions.md`. That file provides comprehensive technical reference for alert development. **If anything in this agent file conflicts with the instructions file, this agent file takes precedence.**
+
 ---
 
 ## Scope of Work
@@ -98,16 +102,13 @@ When adding or modifying alerts:
 
 When an alert depends on a tenant having certain SKUs or capabilities, you **must**:
 
-- Use `Test-CIPPStandardLicense`  
+- Use `Test-CIPPStandardLicense`
+- Prefer `-Preset` for common capability sets: `Exchange`, `SharePoint`, `Intune`, `Entra`, `EntraP2`, `Teams`, `Compliance`
+- Use `-RequiredCapabilities` only when no preset matches, or combine it with `-Preset` for extra edge-case capabilities
 - Do **not** manually inspect SKUs, raw license IDs, or raw capability lists.
 
 Example pattern (adapt to the specific feature):
 
 ```powershell
-$TestResult = Test-CIPPStandardLicense -StandardName 'AutopilotProfile' -TenantFilter $Tenant -RequiredCapabilities @(
-    'INTUNE_A',
-    'MDM_Services',
-    'EMS',
-    'SCCM',
-    'MICROSOFTINTUNEPLAN1'
-)
+$TestResult = Test-CIPPStandardLicense -StandardName 'AutopilotProfile' -TenantFilter $Tenant -Preset Intune
+```

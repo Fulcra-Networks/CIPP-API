@@ -31,7 +31,7 @@ function Invoke-CIPPDBCacheCollection {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
-        [ValidateSet('Graph', 'ExchangeConfig', 'ExchangeData', 'ConditionalAccess', 'IdentityProtection', 'Intune')]
+        [ValidateSet('Graph', 'ExchangeConfig', 'ExchangeData', 'ConditionalAccess', 'IdentityProtection', 'Intune', 'Compliance', 'CopilotUsage', 'SharePoint', 'Teams')]
         [string]$CollectionType,
 
         [Parameter(Mandatory = $true)]
@@ -80,10 +80,6 @@ function Invoke-CIPPDBCacheCollection {
             'ExoAcceptedDomains'
             'ExoHostedContentFilterPolicy'
             'ExoHostedOutboundSpamFilterPolicy'
-            'ExoAntiPhishPolicy'
-            'ExoSafeLinksPolicy'
-            'ExoSafeAttachmentPolicy'
-            'ExoMalwareFilterPolicy'
             'ExoAtpPolicyForO365'
             'ExoQuarantinePolicy'
             'ExoRemoteDomain'
@@ -91,11 +87,17 @@ function Invoke-CIPPDBCacheCollection {
             'ExoAdminAuditLogConfig'
             'ExoPresetSecurityPolicy'
             'ExoTenantAllowBlockList'
+            'ExoInboundConnector'
+            'ExoProtectionAlert'
+            'OwaMailboxPolicy'
+            'ReportSubmissionPolicy'
+            'ExoTransportConfig'
         )
         ExchangeData       = @(
             'CASMailboxes'
             'MailboxUsage'
-            'OneDriveUsage'
+            'OfficeActivations'
+            'HVEAccounts'
         )
         ConditionalAccess  = @(
             'ConditionalAccessPolicies'
@@ -114,9 +116,42 @@ function Invoke-CIPPDBCacheCollection {
         Intune             = @(
             'ManagedDevices'
             'IntunePolicies'
+            'IntuneApplications'
+            'IntuneAssignmentFilters'
+            'IntuneCompliancePolicies'
             'ManagedDeviceEncryptionStates'
             'IntuneAppProtectionPolicies'
+            'IntuneScripts'
+            'IntuneReusableSettings'
             'DetectedApps'
+            'MDEOnboarding'
+        )
+        Compliance         = @(
+            'SensitivityLabels'
+            'DlpCompliancePolicies'
+        )
+        CopilotUsage       = @(
+            'CopilotUsageUserDetail'
+            'CopilotUserCountSummary'
+            'CopilotUserCountTrend'
+            'CopilotReadinessActivity'
+        )
+        SharePoint         = @(
+            'SPOTenant'
+            'SPOTenantSyncClientRestriction'
+            'SharePointSiteUsage'
+            'OneDriveUsage'
+        )
+        Teams              = @(
+            'CsTeamsMeetingPolicy'
+            'CsTeamsClientConfiguration'
+            'CsExternalAccessPolicy'
+            'CsTenantFederationConfiguration'
+            'CsTeamsMessagingPolicy'
+            'CsTeamsAppPermissionPolicy'
+            'Teams'
+            'TeamsActivity'
+            'TeamsVoice'
         )
     }
 
@@ -148,13 +183,13 @@ function Invoke-CIPPDBCacheCollection {
             Write-Information "  [$CollectionType] Collecting $CacheType for $TenantFilter"
             & $FullFunctionName @Params
             $ItemStopwatch.Stop()
-            $ElapsedSeconds = [math]::Round($ItemStopwatch.Elapsed.TotalSeconds, 3)
+            $ElapsedSeconds = '{0:N3}' -f $ItemStopwatch.Elapsed.TotalSeconds
             $Timings.Add("$CacheType : ${ElapsedSeconds}s")
             Write-Information "  [$CollectionType] Completed $CacheType for $TenantFilter - Took ${ElapsedSeconds} seconds"
             $SuccessCount++
         } catch {
             $ItemStopwatch.Stop()
-            $ElapsedSeconds = [math]::Round($ItemStopwatch.Elapsed.TotalSeconds, 3)
+            $ElapsedSeconds = '{0:N3}' -f $ItemStopwatch.Elapsed.TotalSeconds
             $FailedCount++
             $Errors.Add("$CacheType : $($_.Exception.Message)")
             $Timings.Add("$CacheType : ${ElapsedSeconds}s (FAILED)")
@@ -163,7 +198,7 @@ function Invoke-CIPPDBCacheCollection {
     }
 
     $CollectionStopwatch.Stop()
-    $TotalElapsed = [math]::Round($CollectionStopwatch.Elapsed.TotalSeconds, 3)
+    $TotalElapsed = '{0:N3}' -f $CollectionStopwatch.Elapsed.TotalSeconds
     $Summary = "$CollectionType collection for $TenantFilter completed in ${TotalElapsed} seconds - $SuccessCount succeeded, $FailedCount failed out of $($CacheTypes.Count)"
     Write-Information $Summary
     Write-Information "  Timings: $($Timings -join ' | ')"
