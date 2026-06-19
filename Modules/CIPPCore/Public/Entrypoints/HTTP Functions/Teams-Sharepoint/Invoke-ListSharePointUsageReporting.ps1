@@ -69,17 +69,38 @@ function Invoke-ListSharePointUsageReporting {
 
         $LatestQuota = $QuotaHistory | Select-Object -Last 1
 
+        # Fetch 180-day storage trend from Graph API (aggregated by site type)
+        $StorageTrend = @()
+        try {
+            $StorageTrendRaw = New-GraphGetRequest `
+                -uri "https://graph.microsoft.com/beta/reports/getSharePointSiteUsageStorage(period='D180')?`$format=application/json" `
+                -tenantid $TenantFilter `
+                -AsApp $true
+
+            $StorageTrend = @($StorageTrendRaw | ForEach-Object {
+                    [PSCustomObject]@{
+                        ReportDate         = $_.reportDate
+                        SiteType           = $_.siteType
+                        StorageUsedInBytes = [long]($_.storageUsedInBytes ?? 0)
+                    }
+                } | Sort-Object -Property ReportDate)
+        }
+        catch {
+            Write-LogMessage -API 'SharePointUsageReporting' -tenant $TenantFilter -message "Error fetching storage trend: $($_.Exception.Message)" -sev Warning
+        }
+
         $Body = @{
-            Results  = @($Results | Sort-Object -Property ReportDate, SiteUrl)
-            Metadata = @{
-                Count                       = @($Results).Count
-                TenantFilter                = $TenantFilter
-                StartDate                   = $StartDate
-                EndDate                     = $EndDate
-                TotalStorageUsedInGigabytes = [math]::round(($Results | Measure-Object -Property StorageUsedInBytes -Sum).Sum / 1GB, 2)
-                Quota                       = $LatestQuota
-                QuotaHistory                = $QuotaHistory
+            Results      = @($Results | Sort-Object -Property ReportDate, SiteUrl)
+            Metadata     = @{                Count = @($Results).Count
+                TenantFilter                   = $TenantFilter
+                StartDate                      = $StartDate
+                EndDate                        = $EndDate
+                TotalStorageUsedInGigabytes    = [math]::round(($Results | Measure-Object -Property StorageUsedInBytes -Sum).Sum / 1GB, 2)
+                Quota                          = $LatestQuota
+                QuotaHistory                   = $QuotaHistory
             }
+            StorageTrend = $StorageTrend
+
         }
         $StatusCode = [HttpStatusCode]::OK
     }

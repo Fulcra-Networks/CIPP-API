@@ -12,7 +12,8 @@ Function Invoke-ListSharepointQuota {
 
     if ($TenantFilter -eq 'AllTenants') {
         $UsedStoragePercentage = 'Not Supported'
-    } else {
+    }
+    else {
         try {
             $SharePointInfo = Get-SharePointAdminLink -Public $false -tenantFilter $TenantFilter
             $extraHeaders = @{
@@ -23,7 +24,8 @@ Function Invoke-ListSharepointQuota {
             if ($SharePointQuota) {
                 $UsedStoragePercentage = [int](($SharePointQuota.GeoUsedStorageMB / $SharePointQuota.TenantStorageMB) * 100)
             }
-        } catch {
+        }
+        catch {
             $UsedStoragePercentage = 'Not available'
         }
     }
