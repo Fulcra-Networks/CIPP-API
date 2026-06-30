@@ -26,11 +26,10 @@ function New-AutotaskTicket {
 
         $ticket = New-AutotaskBody -Resource Tickets -NoContent
         $ticket.Id                      = "0"                   #Always 0 for a new ticket
-        $ticket.ticketType              = "1"
         $ticket.companyId               = "$($atCompanyId)"
         $ticket.priority                = $priority
         $ticket.ticketCategory          = "3"
-        $ticket.ticketType              = "5"
+        $ticket.ticketType              = $ticketType
         $ticket.serviceLevelAgreementID = "1"
         $ticket.issueType               = $issueType
         $ticket.subIssueType            = $subIssueType
