@@ -9,7 +9,7 @@ $JWT=""
 $Companies = @()
 $apiHost = ""
 
-function New-IronScalestickets {
+function New-IronScalesTickets {
     param($IronScalesIncidents)
 
     if($IronScalesIncidents.length -eq 0){
@@ -85,7 +85,7 @@ function Get-TicketQueryFilter {
     $field1 = "title"
     $value1 = $TicketTitle
     $field2 = "status"
-    $value2 = @("1","7","8","12")
+    $value2 = @("1","8","12")
     <#  New                 1
         Waiting Customer    7
         In Progress         8
@@ -153,7 +153,7 @@ function Get-IronScalesIncidents {
     Write-LogMessage -API "IronScales" -tenant "none" -message "Got $($all_unclassified.Length) companies with unclassified incidents." -sev Debug
 
 
-    New-IronScalestickets $all_unclassified
+    New-IronScalesTickets $all_unclassified
 }
 
 function Get-Companies {
@@ -219,7 +219,7 @@ function Get-BodyForTicket {
 
     $body = @()
     foreach($incident in $company.Incidents){
-        $body += "$($company.CustomerName)`nEmail Subject: $($incident.emailSubject)`nEmail Recipient: $($incident.recipientEmail)`nAffected Mailboxes: $($incident.affectedMailboxesCount)`n"
+        $body += $body += "$($company.CustomerName)`nEmail Subject: $($incident.emailSubject)`nEmail Sender Address: $($incident.senderEmail)`nEmail Sender Name: $($incident.senderName)`n`Email Recipient: $($incident.recipientEmail)`nAffected Mailboxes: $($incident.affectedMailboxesCount)`nReported By: $($incident.reportedBy)"
     }
     $body += "`n`nTo classify the incident(s) go to https://members.ironscales.com/irontraps/incidents/unclassified"
     return ($body -replace '[\u201c-\u201d]','')
