@@ -31,3 +31,7 @@ CLAUDE.md
 !/profile.ps1
 .DS_Store
 proxyman.pem
+
+# Pester test runner artifacts (Invoke-CippTests.ps1 -CI / -Coverage)
+Tests/TestResults.xml
+Tests/coverage.xml
