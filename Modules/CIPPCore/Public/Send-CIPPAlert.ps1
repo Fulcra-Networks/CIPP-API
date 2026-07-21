@@ -362,29 +362,20 @@ function Send-CIPPAlert {
                     AlertTitle = "$($Title)"
                     AlertJSON  = $JSONContent
                 }
-                New-CippExtAlert -Alert $Alert
+                if ($AffectedUser) {
+                    $Alert.AffectedUser = $AffectedUser
+                    $UserLabel = if ($AffectedUser.UPN) { $AffectedUser.UPN } elseif ($AffectedUser.AzureOID) { "OID:$($AffectedUser.AzureOID)" } else { 'unknown' }
+                    Write-Information "PSA alert AffectedUser: $UserLabel"
+                }
+                $PsaResult = New-CippExtAlert -Alert $Alert
+                if ($PsaResult) {
+                    Write-Information "PSA result: $PsaResult"
+                }
                 Write-LogMessage -API 'Webhook Alerts' -tenant $TenantFilter -message "Sent PSA alert $title" -sev info
-            }
-            catch {
+            } catch {
                 $ErrorMessage = Get-CippException -Exception $_
                 Write-Information "Could not send alerts to ticketing system: $($ErrorMessage.NormalizedError)"
                 Write-LogMessage -API 'Webhook Alerts' -tenant $TenantFilter -message "Could not send alerts to ticketing system: $($ErrorMessage.NormalizedError)" -sev Error -LogData $ErrorMessage
             }
-            if ($AffectedUser) {
-                $Alert.AffectedUser = $AffectedUser
-                $UserLabel = if ($AffectedUser.UPN) { $AffectedUser.UPN } elseif ($AffectedUser.AzureOID) { "OID:$($AffectedUser.AzureOID)" } else { 'unknown' }
-                Write-Information "PSA alert AffectedUser: $UserLabel"
-            }
-            $PsaResult = New-CippExtAlert -Alert $Alert
-            if ($PsaResult) {
-                Write-Information "PSA result: $PsaResult"
-            }
-            Write-LogMessage -API 'Webhook Alerts' -tenant $TenantFilter -message "Sent PSA alert $title" -sev info
-        }
-        catch {
-            $ErrorMessage = Get-CippException -Exception $_
-            Write-Information "Could not send alerts to ticketing system: $($ErrorMessage.NormalizedError)"
-            Write-LogMessage -API 'Webhook Alerts' -tenant $TenantFilter -message "Could not send alerts to ticketing system: $($ErrorMessage.NormalizedError)" -sev Error -LogData $ErrorMessage
         }
     }
-}
