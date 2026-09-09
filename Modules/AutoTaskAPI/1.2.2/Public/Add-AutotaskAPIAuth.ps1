@@ -29,13 +29,22 @@ function Add-AutotaskAPIAuth (
     }
     write-host "Retrieving webservices URI based on username" -ForegroundColor Green
     try {
-        $Version = (Invoke-RestMethod -Uri "https://webservices2.autotask.net/atservicesrest/versioninformation").apiversions | select-object -last 1
+        # The bundled swagger (v1.json) only describes /V1.0/ paths, so the zone lookup must use
+        # V1.0 as well. Autotask now advertises "V2.0" in versioninformation, but
+        # /V2.0/zoneInformation returns 404 - taking the *last* advertised version breaks auth.
+        $ApiVersions = (Invoke-RestMethod -Uri "https://webservices2.autotask.net/atservicesrest/versioninformation").apiVersions
+        $Version = $ApiVersions | Where-Object { $_ -match '^V?1\.0$' } | Select-Object -First 1
+        if (-not $Version) { $Version = 'V1.0' }
         $AutotaskBaseURI = Invoke-RestMethod -Uri "https://webservices2.autotask.net/atservicesrest/$($Version)/zoneInformation?user=$($Script:AutotaskAuthHeader.UserName)"
         write-host "Setting AutotaskBaseURI to $($AutotaskBaseURI.url) using version $Version" -ForegroundColor green
         Add-AutotaskBaseURI -BaseURI $AutotaskBaseURI.url.Trim('/')
     }
     catch {
-        write-host "Could not Retrieve baseuri. E-mail address might be incorrect. You can manually add the baseuri via the Add-AutotaskBaseURI cmdlet. $($_.Exception.Message)" -ForegroundColor red
+        # Rethrow: silently returning here leaves $Script:*Parameter unset, which makes the
+        # -Resource dynamic parameter disappear from every cmdlet in this module. Callers then
+        # see "A parameter cannot be found that matches parameter name 'Resource'" instead of
+        # the actual auth failure.
+        throw "Could not retrieve Autotask baseuri (version '$Version', user '$($Script:AutotaskAuthHeader.UserName)'). E-mail address might be incorrect, or you can set the baseuri manually via Add-AutotaskBaseURI. $($_.Exception.Message)"
     }
 
 }

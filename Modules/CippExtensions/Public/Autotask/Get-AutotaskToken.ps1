@@ -25,6 +25,10 @@ function Get-AutotaskToken {
             $_.Exception.message
         }
         Write-LogMessage -Message $Message -sev error -API 'Autotask'
+        # Without this, callers continue with an unauthenticated module whose cmdlets have no
+        # -Resource dynamic parameter, producing a misleading parameter-binding error far from
+        # the real cause.
+        throw "Autotask authentication failed: $Message"
     }
     return $null
 
