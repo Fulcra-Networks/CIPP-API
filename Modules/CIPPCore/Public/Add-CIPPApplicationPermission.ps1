@@ -31,11 +31,9 @@ function Add-CIPPApplicationPermission {
     } else {
         if (!$RequiredResourceAccess -and $TemplateId) {
             Write-Information "Adding application permissions for template $TemplateId"
-            $TemplateTable = Get-CIPPTable -TableName 'templates'
-            $Filter = "RowKey eq '$TemplateId' and PartitionKey eq 'AppApprovalTemplate'"
-            $Template = (Get-CIPPAzDataTableEntity @TemplateTable -Filter $Filter).JSON | ConvertFrom-Json -ErrorAction SilentlyContinue
-            $ApplicationId = $Template.AppId
-            $Permissions = $Template.Permissions
+            $TemplatePermissions = Get-CIPPAppApprovalPermissions -TemplateId $TemplateId
+            $ApplicationId = $TemplatePermissions.ApplicationId
+            $Permissions = $TemplatePermissions.Permissions
             $RequiredResourceAccess = [System.Collections.Generic.List[object]]::new()
             foreach ($AppId in $Permissions.PSObject.Properties.Name) {
                 $AppPermissions = @($Permissions.$AppId.applicationPermissions)
@@ -162,6 +160,11 @@ function Add-CIPPApplicationPermission {
         } catch {
             $Results.add("Failed to grant permissions in bulk: $(Get-NormalizedError -message $_.Exception.Message)")
         }
+    }
+    if ($counter -gt 0) {
+        # App-only scopes changed; a cached client_credentials token still carries the old
+        # roles, so drop it rather than wait out its TTL.
+        $null = Clear-CippTokenCache -TenantFilter $TenantFilter
     }
     "Added $counter Application permissions to $($ourSVCPrincipal.displayName)"
     return $Results

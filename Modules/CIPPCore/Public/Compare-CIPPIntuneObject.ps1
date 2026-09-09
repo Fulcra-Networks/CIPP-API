@@ -36,8 +36,16 @@ function Compare-CIPPIntuneObject {
             'locationInfo',
             'templateId',
             'source',
-            'package'
+            'package',
+            'assignments'
         )
+
+        # App protection templates store apps[] and deployedAppCount, but deployment strips apps
+        # and the policy read-back never returns either, so they can never match. Scoped to
+        # AppProtection because Device configs carry legitimate nested 'apps' (e.g. kiosk profiles).
+        if ($CompareType -contains 'AppProtection') {
+            $defaultExcludeProperties = $defaultExcludeProperties + @('apps', 'deployedAppCount')
+        }
 
         $excludeProps = $defaultExcludeProperties + $ExcludeProperties
         $result = [System.Collections.Generic.List[PSObject]]::new()
@@ -370,6 +378,17 @@ function Compare-CIPPIntuneObject {
         foreach ($item in $intuneCollection) {
             if ($item.id) { $intuneCollectionIndex[$item.id] = $item }
         }
+
+        # Settings Intune generates per tenant. The Defender onboarding blob embeds the tenant's own
+        # workspace identity, so a template captured in one tenant can never match another - it
+        # reports drift on every run, remediation cannot resolve it, and the comparison shows a
+        # friendly option name on one side against a raw identifier on the other.
+        $tenantSpecificSettings = @(
+            'device_vendor_msft_windowsadvancedthreatprotection_onboarding',
+            'device_vendor_msft_windowsadvancedthreatprotection_onboarding_fromconnector',
+            'device_vendor_msft_windowsadvancedthreatprotection_offboarding',
+            'device_vendor_msft_windowsadvancedthreatprotection_offboarding_fromconnector'
+        )
 
         # Recursive function to process group setting collections at any depth
         function Process-GroupSettingChildren {
@@ -732,6 +751,8 @@ function Compare-CIPPIntuneObject {
             } elseif ($key -like 'Unknown-*') {
                 $settingId = $key.Substring(8)
             }
+
+            if ($settingId -in $tenantSpecificSettings) { continue }
 
             $settingDefinition = $intuneCollectionIndex[$settingId]
 

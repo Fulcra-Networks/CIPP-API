@@ -96,7 +96,7 @@ function Invoke-ExecCommunityRepo {
         'Delete' {
             if ($RepoEntity) {
                 $Delete = $RepoEntity | Select-Object PartitionKey, RowKey, ETag
-                Remove-AzDataTableEntity @Table -Entity $Delete
+                Remove-CIPPAzDataTableEntity @Table -Entity $Delete
             }
             $Results = @{
                 resultText = "Repository $($RepoEntity.Name) deleted"
@@ -106,10 +106,10 @@ function Invoke-ExecCommunityRepo {
         'UploadTemplate' {
             $GUID = $Request.Body.GUID
             $TemplateTable = Get-CIPPTable -TableName templates
-            $TemplateEntity = Get-CIPPAzDataTableEntity @TemplateTable -Filter "RowKey eq '$($GUID)'" | Select-Object -ExcludeProperty ETag, Timestamp
+            $TemplateEntity = Get-CIPPAzDataTableEntity @TemplateTable -Filter "RowKey eq '$($GUID)' or OriginalEntityId eq '$($GUID)'" | Select-Object -ExcludeProperty ETag, Timestamp
             $Branch = $RepoEntity.UploadBranch ?? $RepoEntity.DefaultBranch
             if ($TemplateEntity) {
-                $Template = $TemplateEntity.JSON | ConvertFrom-Json
+                $Template = $TemplateEntity.JSON | ConvertFrom-Json -Depth 100 -ErrorAction Stop
                 $DisplayName = $Template.Displayname ?? $Template.templateName ?? $Template.name
                 if ($Template.tenantFilter) {
                     $Template.tenantFilter = @(@{ label = 'Template Tenant'; value = 'Template Tenant' })

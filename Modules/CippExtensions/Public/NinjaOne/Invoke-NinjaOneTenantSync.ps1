@@ -749,13 +749,13 @@ function Invoke-NinjaOneTenantSync {
 
         [System.Collections.Generic.List[PSCustomObject]]$StaleParsedUsers = Get-CIPPAzDataTableEntity @UsersTable -Filter $UsersFilter
         if (($StaleParsedUsers | Measure-Object).count -gt 0) {
-            Remove-AzDataTableEntity -Force @UsersTable -Entity ($StaleParsedUsers | Select-Object PartitionKey, RowKey)
+            Remove-CIPPAzDataTableEntity -Force @UsersTable -Entity ($StaleParsedUsers | Select-Object PartitionKey, RowKey)
         }
         [System.Collections.Generic.List[PSCustomObject]]$ParsedUsers = @()
 
         [System.Collections.Generic.List[PSCustomObject]]$StaleUserUpdates = Get-CIPPAzDataTableEntity @UsersUpdateTable -Filter $UsersFilter
         if (($StaleUserUpdates | Measure-Object).count -gt 0) {
-            Remove-AzDataTableEntity -Force @UsersUpdateTable -Entity ($StaleUserUpdates | Select-Object PartitionKey, RowKey)
+            Remove-CIPPAzDataTableEntity -Force @UsersUpdateTable -Entity ($StaleUserUpdates | Select-Object PartitionKey, RowKey)
         }
 
         [System.Collections.Generic.List[PSCustomObject]]$UsersMap = Get-CIPPAzDataTableEntity @UsersMapTable -Filter $UsersFilter
@@ -1210,7 +1210,7 @@ function Invoke-NinjaOneTenantSync {
                         if (($NinjaUserCreation | Measure-Object).count -ge 100) {
                             Write-Information 'Creating NinjaOne Users'
                             [System.Collections.Generic.List[PSCustomObject]]$CreatedUsers = (Invoke-WebRequest -Uri "https://$($Configuration.Instance)/api/v2/organization/documents" -Method POST -Headers @{Authorization = "Bearer $($token.access_token)" } -ContentType 'application/json; charset=utf-8' -Body ("[$($NinjaUserCreation.body -join ',')]") -EA Stop).content | ConvertFrom-Json -Depth 100
-                            Remove-AzDataTableEntity -Force @UsersUpdateTable -Entity $NinjaUserCreation
+                            Remove-CIPPAzDataTableEntity -Force @UsersUpdateTable -Entity $NinjaUserCreation
                             [System.Collections.Generic.List[PSCustomObject]]$NinjaUserCreation = @()
                         }
                     } catch {
@@ -1223,7 +1223,7 @@ function Invoke-NinjaOneTenantSync {
                         if (($NinjaUserUpdates | Measure-Object).count -ge 100) {
                             Write-Information 'Updating NinjaOne Users'
                             [System.Collections.Generic.List[PSCustomObject]]$UpdatedUsers = (Invoke-WebRequest -Uri "https://$($Configuration.Instance)/api/v2/organization/documents" -Method PATCH -Headers @{Authorization = "Bearer $($token.access_token)" } -ContentType 'application/json; charset=utf-8' -Body ("[$($NinjaUserUpdates.body -join ',')]") -EA Stop).content | ConvertFrom-Json -Depth 100
-                            Remove-AzDataTableEntity -Force @UsersUpdateTable -Entity $NinjaUserUpdates
+                            Remove-CIPPAzDataTableEntity -Force @UsersUpdateTable -Entity $NinjaUserUpdates
                             [System.Collections.Generic.List[PSCustomObject]]$NinjaUserUpdates = @()
                         }
                     } catch {
@@ -1287,7 +1287,7 @@ function Invoke-NinjaOneTenantSync {
                 if (($NinjaUserCreation | Measure-Object).count -ge 1) {
                     Write-Information 'Creating NinjaOne Users'
                     [System.Collections.Generic.List[PSCustomObject]]$CreatedUsers = (Invoke-WebRequest -Uri "https://$($Configuration.Instance)/api/v2/organization/documents" -Method POST -Headers @{Authorization = "Bearer $($token.access_token)" } -ContentType 'application/json; charset=utf-8' -Body ("[$($NinjaUserCreation.body -join ',')]") -EA Stop).content | ConvertFrom-Json -Depth 100
-                    Remove-AzDataTableEntity -Force @UsersUpdateTable -Entity $NinjaUserCreation
+                    Remove-CIPPAzDataTableEntity -Force @UsersUpdateTable -Entity $NinjaUserCreation
 
                 }
             } catch {
@@ -1300,7 +1300,7 @@ function Invoke-NinjaOneTenantSync {
                 if (($NinjaUserUpdates | Measure-Object).count -ge 1) {
                     Write-Information 'Updating NinjaOne Users'
                     [System.Collections.Generic.List[PSCustomObject]]$UpdatedUsers = (Invoke-WebRequest -Uri "https://$($Configuration.Instance)/api/v2/organization/documents" -Method PATCH -Headers @{Authorization = "Bearer $($token.access_token)" } -ContentType 'application/json; charset=utf-8' -Body ("[$($NinjaUserUpdates.body -join ',')]") -EA Stop).content | ConvertFrom-Json -Depth 100
-                    Remove-AzDataTableEntity -Force @UsersUpdateTable -Entity $NinjaUserUpdates
+                    Remove-CIPPAzDataTableEntity -Force @UsersUpdateTable -Entity $NinjaUserUpdates
                 }
             } catch {
                 $ErrorMessage = Get-CippException -Exception $_
@@ -2198,9 +2198,12 @@ function Invoke-NinjaOneTenantSync {
                 $ScanGroupName   = "$ScanGroupPrefix$TenantFilter"
                 $NinjaBaseUrl    = "https://$($Configuration.Instance)/api/v2"
 
-                $ResolvedScanGroup = Resolve-NinjaOneCveScanGroup -Configuration $Configuration -TenantFilter $TenantFilter -ScanGroupName $ScanGroupName -NinjaBaseUrl $NinjaBaseUrl -Token $Token
+                $CveScanGroups = Invoke-RestMethod -Method Get -Uri "$NinjaBaseUrl/vulnerability/scan-groups" -Headers @{ Authorization = "Bearer $($Token.access_token)" } -TimeoutSec 30 -ErrorAction Stop
+                $ResolvedScanGroup = $CveScanGroups | Where-Object { $_.groupName -eq $ScanGroupName }
 
-                if ($ResolvedScanGroup) {
+                if (-not $ResolvedScanGroup) {
+                    Write-LogMessage -API 'NinjaOneSync' -tenant $TenantFilter -message "CVE sync skipped — scan group '$ScanGroupName' not found" -sev 'Warning'
+                } else {
                     $ResolvedScanGroupId = $ResolvedScanGroup.id
                     $DeviceIdHeader      = $ResolvedScanGroup.deviceIdHeader
                     $CveIdHeader         = $ResolvedScanGroup.cveIdHeader
@@ -2278,12 +2281,12 @@ function Invoke-NinjaOneTenantSync {
 
         Write-Information 'Cleaning Users Cache'
         if (($ParsedUsers | Measure-Object).count -gt 0) {
-            Remove-AzDataTableEntity -Force @UsersTable -Entity ($ParsedUsers | Select-Object PartitionKey, RowKey)
+            Remove-CIPPAzDataTableEntity -Force @UsersTable -Entity ($ParsedUsers | Select-Object PartitionKey, RowKey)
         }
 
         Write-Information 'Cleaning Device Cache'
         if (($ParsedDevices | Measure-Object).count -gt 0) {
-            Remove-AzDataTableEntity -Force @DeviceTable -Entity ($ParsedDevices | Select-Object PartitionKey, RowKey)
+            Remove-CIPPAzDataTableEntity -Force @DeviceTable -Entity ($ParsedDevices | Select-Object PartitionKey, RowKey)
         }
 
         Write-Information "Total Fetch Time: $((New-TimeSpan -Start $StartTime -End $FetchEnd).TotalSeconds)"
