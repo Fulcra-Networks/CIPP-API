@@ -12,40 +12,45 @@ function Compare-CIPPIntuneObject {
         [Parameter(Mandatory = $false)]
         [string[]]$CompareType = @()
     )
-    if ($CompareType -notcontains 'Catalog') {
-        $defaultExcludeProperties = @(
-            'id',
-            'createdDateTime',
-            'lastModifiedDateTime',
-            'supportsScopeTags',
-            'modifiedDateTime',
-            'version',
-            'roleScopeTagIds',
-            'settingCount',
-            'creationSource',
-            'priorityMetaData'
-            'featureUpdatesWillBeRolledBack',
-            'qualityUpdatesWillBeRolledBack',
-            'qualityUpdatesPauseStartDate',
-            'featureUpdatesPauseStartDate'
-            'wslDistributions',
-            'lastSuccessfulSyncDateTime',
-            'tenantFilter',
-            'agents',
-            'isSynced'
-            'locationInfo',
-            'templateId',
-            'source',
-            'package',
-            'assignments'
-        )
 
-        # App protection templates store apps[] and deployedAppCount, but deployment strips apps
-        # and the policy read-back never returns either, so they can never match. Scoped to
-        # AppProtection because Device configs carry legitimate nested 'apps' (e.g. kiosk profiles).
-        if ($CompareType -contains 'AppProtection') {
-            $defaultExcludeProperties = $defaultExcludeProperties + @('apps', 'deployedAppCount')
+    # Reusable settings carry a per-entry instance id that Intune mints on create, held in the
+    # child whose settingDefinitionId ends in '_id'. A template keeps the ids from the tenant it
+    # was captured in, so every entry differs on first read and the setting reports drift forever
+    # even when it deployed correctly. The exclusion list cannot express this: it matches property
+    # names, and this is a value keyed by a sibling settingDefinitionId.
+    if ($CompareType -contains 'ReusablePolicySetting') {
+        function Clear-ReusableInstanceId {
+            param($Node)
+            if ($null -eq $Node) { return }
+            if ($Node -is [System.Collections.IEnumerable] -and $Node -isnot [string]) {
+                foreach ($Item in $Node) { Clear-ReusableInstanceId -Node $Item }
+                return
+            }
+            if ($Node -isnot [psobject]) { return }
+
+            foreach ($Child in @($Node.children)) {
+                if ($Child.settingDefinitionId -like '*_id' -and $Child.simpleSettingValue) {
+                    $Child.simpleSettingValue.value = ''
+                }
+            }
+            foreach ($Prop in $Node.PSObject.Properties) {
+                if ($Prop.Name -eq 'children') { continue }
+                Clear-ReusableInstanceId -Node $Prop.Value
+            }
         }
+        # Copy first: these objects belong to the caller, and the standard reuses the template body
+        # to build the remediation payload, where the real ids still matter.
+        $ReferenceObject = $ReferenceObject | ConvertTo-Json -Depth 100 -Compress | ConvertFrom-Json
+        $DifferenceObject = $DifferenceObject | ConvertTo-Json -Depth 100 -Compress | ConvertFrom-Json
+        Clear-ReusableInstanceId -Node $ReferenceObject
+        Clear-ReusableInstanceId -Node $DifferenceObject
+    }
+
+    if ($CompareType -notcontains 'Catalog') {
+        # The exclusion list lives in Get-CIPPIntuneCompareExclusions - the baseline
+        # engine's hard-gap pass consumes the SAME list so it never resurrects a
+        # property this compare deliberately ignores.
+        $defaultExcludeProperties = @(Get-CIPPIntuneCompareExclusions -AppProtection:($CompareType -contains 'AppProtection'))
 
         $excludeProps = $defaultExcludeProperties + $ExcludeProperties
         $result = [System.Collections.Generic.List[PSObject]]::new()
@@ -80,7 +85,8 @@ function Compare-CIPPIntuneObject {
                 'includeDevices',
                 'excludeDevices',
                 'includeGuestOrExternalUserTypes',
-                'excludeGuestOrExternalUserTypes'
+                'excludeGuestOrExternalUserTypes',
+                'NotifyUser'
             )
 
             foreach ($pattern in $unorderedSetPatterns) {
@@ -127,7 +133,40 @@ function Compare-CIPPIntuneObject {
                 return
             }
 
-            if ($Object1.GetType() -ne $Object2.GetType()) {
+            # A JSON round-trip collapses a single-element collection to its scalar and widens
+            # int to long: wrapper and width differences are not value differences, and the
+            # type gate below would report them with identical-looking values on both sides.
+            # A multi-element collection against a scalar stays a real difference.
+            $Object1IsList = $Object1 -isnot [string] -and ($Object1 -is [Array] -or $Object1 -is [System.Collections.IList])
+            $Object2IsList = $Object2 -isnot [string] -and ($Object2 -is [Array] -or $Object2 -is [System.Collections.IList])
+            if ($Object1IsList -xor $Object2IsList) {
+                $ListSide = if ($Object1IsList) { $Object1 } else { $Object2 }
+                if (@($ListSide).Count -eq 1) {
+                    Compare-ObjectsRecursively -Object1 @($Object1)[0] -Object2 @($Object2)[0] -PropertyPath $PropertyPath -Depth ($Depth + 1) -MaxDepth $MaxDepth
+                } else {
+                    $result.Add([PSCustomObject]@{
+                            Property      = $PropertyPath
+                            ExpectedValue = (@($Object1) -join ', ')
+                            ReceivedValue = (@($Object2) -join ', ')
+                        })
+                }
+                return
+            }
+            $NumericTypes = @([int], [long], [double], [decimal], [int16], [byte], [single])
+            $Object1IsNumber = @($NumericTypes | Where-Object { $Object1 -is $_ }).Count -gt 0
+            $Object2IsNumber = @($NumericTypes | Where-Object { $Object2 -is $_ }).Count -gt 0
+            if ($Object1IsNumber -and $Object2IsNumber) {
+                if ($Object1 -ne $Object2) {
+                    $result.Add([PSCustomObject]@{
+                            Property      = $PropertyPath
+                            ExpectedValue = $Object1
+                            ReceivedValue = $Object2
+                        })
+                }
+                return
+            }
+
+            if (-not ($Object1IsList -and $Object2IsList) -and $Object1.GetType() -ne $Object2.GetType()) {
                 $result.Add([PSCustomObject]@{
                         Property      = $PropertyPath
                         ExpectedValue = $Object1
@@ -364,6 +403,32 @@ function Compare-CIPPIntuneObject {
             $DifferenceObject
         }
 
+        # CompareType 'ca': a CA template stores grantControls.authenticationStrength as a bare
+        # { id } reference - which is also all New-CIPPCAPolicy ever writes - while Graph returns
+        # the strength fully expanded on read. Comparing those two shapes reported displayName,
+        # description, policyType, requirementsSatisfied and allowedCombinations as drift on every
+        # run, which remediation could never clear because none of them are writable through the CA
+        # policy. Collapse both sides to the display name, the identity deployment matches on.
+        if ($CompareType -contains 'ca' -and $obj1 -and $obj2) {
+            # Clone first - the callers keep using their objects after the compare.
+            $obj1 = $obj1 | ConvertTo-Json -Depth 100 -Compress | ConvertFrom-Json -Depth 100
+            $obj2 = $obj2 | ConvertTo-Json -Depth 100 -Compress | ConvertFrom-Json -Depth 100
+            # Graph always expands on read, so the live side names the template's bare id for us.
+            $StrengthNames = @{}
+            foreach ($Side in @($obj1, $obj2)) {
+                $Strength = $Side.grantControls.authenticationStrength
+                if ($Strength -isnot [System.Management.Automation.PSCustomObject]) { continue }
+                if ($Strength.id -and $Strength.displayName) { $StrengthNames["$($Strength.id)"] = "$($Strength.displayName)" }
+            }
+            foreach ($Side in @($obj1, $obj2)) {
+                $Strength = $Side.grantControls.authenticationStrength
+                if ($Strength -isnot [System.Management.Automation.PSCustomObject]) { continue }
+                $Side.grantControls.authenticationStrength = [PSCustomObject]@{
+                    displayName = if ($Strength.displayName) { "$($Strength.displayName)" } else { $StrengthNames["$($Strength.id)"] ?? "$($Strength.id)" }
+                }
+            }
+        }
+
         if ($obj1 -and $obj2) {
             Compare-ObjectsRecursively -Object1 $obj1 -Object2 $obj2
         }
@@ -372,11 +437,31 @@ function Compare-CIPPIntuneObject {
             return $null
         }
     } else {
-        $intuneCollection = Get-Content "$env:CIPPRootPath\Config\intuneCollection.json" | ConvertFrom-Json -ErrorAction SilentlyContinue
-        # Build a hashtable index for O(1) lookups instead of O(n) Where-Object scans
-        $intuneCollectionIndex = @{}
-        foreach ($item in $intuneCollection) {
-            if ($item.id) { $intuneCollectionIndex[$item.id] = $item }
+        # Process-wide, built once. Reparsing the 18MB collection on every call is what used to put
+        # this function over the container's GC heap hard limit - see Get-CIPPIntuneDefinitionIndex.
+        # A miss returns $null the way the hashtable this replaced did, but a $null key throws, so
+        # every lookup below stays guarded.
+        $intuneCollectionIndex = Get-CIPPIntuneDefinitionIndex
+        if ($null -eq $intuneCollectionIndex) {
+            $intuneCollectionIndex = [System.Collections.Generic.Dictionary[string, object]]::new([System.StringComparer]::OrdinalIgnoreCase)
+        }
+
+        # Options are indexed by id, so resolving a raw value to its friendly label is a lookup
+        # rather than a Where-Object scan over the definition's option list. Values that match no
+        # option - and settings that carry none - come back unchanged, which is what every call
+        # site did for itself before.
+        function Resolve-SettingOptionLabel {
+            param (
+                $Definition,
+                $Value
+            )
+
+            if ($null -eq $Value) { return $Value }
+            if (-not $Definition -or -not $Definition.options) { return $Value }
+
+            $Label = $null
+            if ($Definition.options.TryGetValue("$Value", [ref]$Label) -and $Label) { return $Label }
+            return $Value
         }
 
         # Settings Intune generates per tenant. The Defender onboarding blob embeds the tenant's own
@@ -391,7 +476,7 @@ function Compare-CIPPIntuneObject {
         )
 
         # Recursive function to process group setting collections at any depth
-        function Process-GroupSettingChildren {
+        function Expand-GroupSettingChildren {
             param(
                 [Parameter(Mandatory = $true)]
                 $Children,
@@ -404,6 +489,11 @@ function Compare-CIPPIntuneObject {
             $results = [System.Collections.Generic.List[PSCustomObject]]::new()
 
             foreach ($child in $Children) {
+                # Null children and null settingDefinitionIds occur in malformed or
+                # partially-captured templates. A $null hashtable index throws, and an
+                # id-less child is un-deployable (Graph drops it on write) - comparing
+                # it guarantees permanent phantom drift, so skip it entirely.
+                if ($null -eq $child -or -not "$($child.settingDefinitionId)") { continue }
                 $childIntuneObj = $IntuneCollectionIndex[$child.settingDefinitionId]
                 $childLabel = if ($childIntuneObj?.displayName) {
                     $childIntuneObj.displayName
@@ -416,7 +506,7 @@ function Compare-CIPPIntuneObject {
                         if ($child.groupSettingCollectionValue) {
                             foreach ($groupValue in $child.groupSettingCollectionValue) {
                                 if ($groupValue.children) {
-                                    $nestedResults = Process-GroupSettingChildren -Children $groupValue.children -Source $Source -IntuneCollectionIndex $IntuneCollectionIndex
+                                    $nestedResults = Expand-GroupSettingChildren -Children $groupValue.children -Source $Source -IntuneCollectionIndex $IntuneCollectionIndex
                                     foreach ($nr in $nestedResults) { $results.Add($nr) }
                                 }
                             }
@@ -425,14 +515,7 @@ function Compare-CIPPIntuneObject {
                     '#microsoft.graph.deviceManagementConfigurationChoiceSettingInstance' {
                         $childValue = $null
                         if ($child.choiceSettingValue?.value) {
-                            $option = $childIntuneObj.options | Where-Object {
-                                $_.id -eq $child.choiceSettingValue.value
-                            }
-                            $childValue = if ($option?.displayName) {
-                                $option.displayName
-                            } else {
-                                $child.choiceSettingValue.value
-                            }
+                            $childValue = Resolve-SettingOptionLabel -Definition $childIntuneObj -Value $child.choiceSettingValue.value
                         }
 
                         $results.Add([PSCustomObject]@{
@@ -459,15 +542,7 @@ function Compare-CIPPIntuneObject {
                         if ($child.choiceSettingCollectionValue) {
                             $values = [System.Collections.Generic.List[string]]::new()
                             foreach ($choiceValue in $child.choiceSettingCollectionValue) {
-                                $option = $childIntuneObj.options | Where-Object {
-                                    $_.id -eq $choiceValue.value
-                                }
-                                $displayValue = if ($option?.displayName) {
-                                    $option.displayName
-                                } else {
-                                    $choiceValue.value
-                                }
-                                $values.Add($displayValue)
+                                $values.Add((Resolve-SettingOptionLabel -Definition $childIntuneObj -Value $choiceValue.value))
                             }
                             $childValue = ($values | Sort-Object) -join ', '
 
@@ -502,7 +577,7 @@ function Compare-CIPPIntuneObject {
 
                 # Also process any children within choice setting values
                 if ($child.choiceSettingValue?.children) {
-                    $nestedResults = Process-GroupSettingChildren -Children $child.choiceSettingValue.children -Source $Source -IntuneCollectionIndex $IntuneCollectionIndex
+                    $nestedResults = Expand-GroupSettingChildren -Children $child.choiceSettingValue.children -Source $Source -IntuneCollectionIndex $IntuneCollectionIndex
                     foreach ($nr in $nestedResults) { $results.Add($nr) }
                 }
             }
@@ -510,17 +585,21 @@ function Compare-CIPPIntuneObject {
             return $results
         }
 
-        # Process reference object settings
-        $referenceItems = $ReferenceObject.settings | ForEach-Object {
+        # Process reference object settings. Piping $null runs the block once with a null
+        # $_, which crashes the collection index lookup - filter those out up front.
+        # Items whose settingInstance has no settingDefinitionId are un-deployable
+        # template artifacts - Graph requires definition ids and silently drops such
+        # instances on write, so comparing them guarantees permanent phantom drift.
+        $referenceItems = $ReferenceObject.settings | Where-Object { $_ -and $_.settingInstance -and "$($_.settingInstance.settingDefinitionId)" } | ForEach-Object {
             $settingInstance = $_.settingInstance
-            $intuneObj = $intuneCollectionIndex[$settingInstance.settingDefinitionId]
+            $intuneObj = if ($null -ne $settingInstance.settingDefinitionId) { $intuneCollectionIndex[$settingInstance.settingDefinitionId] } else { $null }
             $tempOutput = switch ($settingInstance.'@odata.type') {
                 '#microsoft.graph.deviceManagementConfigurationGroupSettingCollectionInstance' {
                     if ($null -ne $settingInstance.groupSettingCollectionValue) {
                         $groupResults = [System.Collections.Generic.List[PSCustomObject]]::new()
                         foreach ($groupValue in $settingInstance.groupSettingCollectionValue) {
                             if ($groupValue.children -is [System.Array]) {
-                                $childResults = Process-GroupSettingChildren -Children $groupValue.children -Source 'Reference' -IntuneCollectionIndex $intuneCollectionIndex
+                                $childResults = Expand-GroupSettingChildren -Children $groupValue.children -Source 'Reference' -IntuneCollectionIndex $intuneCollectionIndex
                                 foreach ($cr in $childResults) { $groupResults.Add($cr) }
                             }
                         }
@@ -562,14 +641,7 @@ function Compare-CIPPIntuneObject {
                             $settingInstance.settingDefinitionId
                         }
 
-                        $option = $intuneObj.options | Where-Object {
-                            $_.id -eq $settingInstance.choiceSettingValue.value
-                        }
-                        $value = if ($option?.displayName) {
-                            $option.displayName
-                        } else {
-                            $settingInstance.choiceSettingValue.value
-                        }
+                        $value = Resolve-SettingOptionLabel -Definition $intuneObj -Value $settingInstance.choiceSettingValue.value
 
                         [PSCustomObject]@{
                             Key    = "Choice-$($settingInstance.settingDefinitionId)"
@@ -580,7 +652,7 @@ function Compare-CIPPIntuneObject {
 
                         # Recurse into children of choice settings (e.g. firewall profile sub-settings)
                         if ($settingInstance.choiceSettingValue.children) {
-                            $childResults = Process-GroupSettingChildren -Children $settingInstance.choiceSettingValue.children -Source 'Reference' -IntuneCollectionIndex $intuneCollectionIndex
+                            $childResults = Expand-GroupSettingChildren -Children $settingInstance.choiceSettingValue.children -Source 'Reference' -IntuneCollectionIndex $intuneCollectionIndex
                             foreach ($cr in $childResults) { $cr }
                         }
                     } elseif ($settingInstance.choiceSettingCollectionValue) {
@@ -591,9 +663,7 @@ function Compare-CIPPIntuneObject {
                         }
                         $values = [System.Collections.Generic.List[string]]::new()
                         foreach ($choiceValue in $settingInstance.choiceSettingCollectionValue) {
-                            $option = $intuneObj.options | Where-Object { $_.id -eq $choiceValue.value }
-                            $displayValue = if ($option?.displayName) { $option.displayName } else { $choiceValue.value }
-                            $values.Add($displayValue)
+                            $values.Add((Resolve-SettingOptionLabel -Definition $intuneObj -Value $choiceValue.value))
                         }
                         [PSCustomObject]@{
                             Key    = "Choice-$($settingInstance.settingDefinitionId)"
@@ -620,16 +690,16 @@ function Compare-CIPPIntuneObject {
         }
 
         # Process difference object settings
-        $differenceItems = $DifferenceObject.settings | ForEach-Object {
+        $differenceItems = $DifferenceObject.settings | Where-Object { $_ -and $_.settingInstance -and "$($_.settingInstance.settingDefinitionId)" } | ForEach-Object {
             $settingInstance = $_.settingInstance
-            $intuneObj = $intuneCollectionIndex[$settingInstance.settingDefinitionId]
+            $intuneObj = if ($null -ne $settingInstance.settingDefinitionId) { $intuneCollectionIndex[$settingInstance.settingDefinitionId] } else { $null }
             $tempOutput = switch ($settingInstance.'@odata.type') {
                 '#microsoft.graph.deviceManagementConfigurationGroupSettingCollectionInstance' {
                     if ($null -ne $settingInstance.groupSettingCollectionValue) {
                         $groupResults = [System.Collections.Generic.List[PSCustomObject]]::new()
                         foreach ($groupValue in $settingInstance.groupSettingCollectionValue) {
                             if ($groupValue.children -is [System.Array]) {
-                                $childResults = Process-GroupSettingChildren -Children $groupValue.children -Source 'Difference' -IntuneCollectionIndex $intuneCollectionIndex
+                                $childResults = Expand-GroupSettingChildren -Children $groupValue.children -Source 'Difference' -IntuneCollectionIndex $intuneCollectionIndex
                                 foreach ($cr in $childResults) { $groupResults.Add($cr) }
                             }
                         }
@@ -671,14 +741,7 @@ function Compare-CIPPIntuneObject {
                             $settingInstance.settingDefinitionId
                         }
 
-                        $option = $intuneObj.options | Where-Object {
-                            $_.id -eq $settingInstance.choiceSettingValue.value
-                        }
-                        $value = if ($option?.displayName) {
-                            $option.displayName
-                        } else {
-                            $settingInstance.choiceSettingValue.value
-                        }
+                        $value = Resolve-SettingOptionLabel -Definition $intuneObj -Value $settingInstance.choiceSettingValue.value
 
                         [PSCustomObject]@{
                             Key    = "Choice-$($settingInstance.settingDefinitionId)"
@@ -689,7 +752,7 @@ function Compare-CIPPIntuneObject {
 
                         # Recurse into children of choice settings (e.g. firewall profile sub-settings)
                         if ($settingInstance.choiceSettingValue.children) {
-                            $childResults = Process-GroupSettingChildren -Children $settingInstance.choiceSettingValue.children -Source 'Difference' -IntuneCollectionIndex $intuneCollectionIndex
+                            $childResults = Expand-GroupSettingChildren -Children $settingInstance.choiceSettingValue.children -Source 'Difference' -IntuneCollectionIndex $intuneCollectionIndex
                             foreach ($cr in $childResults) { $cr }
                         }
                     } elseif ($settingInstance.choiceSettingCollectionValue) {
@@ -700,9 +763,7 @@ function Compare-CIPPIntuneObject {
                         }
                         $values = [System.Collections.Generic.List[string]]::new()
                         foreach ($choiceValue in $settingInstance.choiceSettingCollectionValue) {
-                            $option = $intuneObj.options | Where-Object { $_.id -eq $choiceValue.value }
-                            $displayValue = if ($option?.displayName) { $option.displayName } else { $choiceValue.value }
-                            $values.Add($displayValue)
+                            $values.Add((Resolve-SettingOptionLabel -Definition $intuneObj -Value $choiceValue.value))
                         }
                         [PSCustomObject]@{
                             Key    = "Choice-$($settingInstance.settingDefinitionId)"
@@ -762,20 +823,14 @@ function Compare-CIPPIntuneObject {
             $refValue = $refRawValue
             $diffValue = $diffRawValue
 
-            if ($null -ne $settingDefinition -and $null -ne $settingDefinition.options) {
-                if ($null -ne $refRawValue -and $refRawValue -is [string]) {
-                    $option = $settingDefinition.options | Where-Object { $_.id -eq $refRawValue }
-                    if ($null -ne $option -and $null -ne $option.displayName) {
-                        $refValue = $option.displayName
-                    }
-                }
+            # Only strings are option ids, so anything else stays as captured. -is [string] is false
+            # for $null, which covers the setting being absent from one side.
+            if ($refRawValue -is [string]) {
+                $refValue = Resolve-SettingOptionLabel -Definition $settingDefinition -Value $refRawValue
+            }
 
-                if ($null -ne $diffRawValue -and $diffRawValue -is [string]) {
-                    $option = $settingDefinition.options | Where-Object { $_.id -eq $diffRawValue }
-                    if ($null -ne $option -and $null -ne $option.displayName) {
-                        $diffValue = $option.displayName
-                    }
-                }
+            if ($diffRawValue -is [string]) {
+                $diffValue = Resolve-SettingOptionLabel -Definition $settingDefinition -Value $diffRawValue
             }
 
             $label = if ($null -ne $settingDefinition -and $null -ne $settingDefinition.displayName) {

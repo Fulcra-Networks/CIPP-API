@@ -5,9 +5,7 @@
     "Description": "The Best Practice Analyser has been deprecated and will be removed in a future release.",
     "Enabled": false,
     "AllowUserToggle": true,
-    "Timers": [
-      "80070b4f-95ed-4e5f-be4c-9e339306d4aa"
-    ],
+    "Timers": ["80070b4f-95ed-4e5f-be4c-9e339306d4aa"],
     "Endpoints": [
       "BestPracticeAnalyser_List",
       "ExecBPA",
@@ -25,7 +23,7 @@
   {
     "Id": "SuperAdminNG",
     "Name": "Super Admin",
-    "Description": "Additional super admin pages for CIPP instances (CIPP Users, SSO, Container management, Custom Domains).",
+    "Description": "Additional super admin pages for CIPP instances (CIPP Users, Container Management, Custom Domains, Container Logs, Worker Health).",
     "Enabled": false,
     "AllowUserToggle": false,
     "Timers": [],
@@ -38,11 +36,11 @@
       "ListWorkerHealth"
     ],
     "Pages": [
-      "/cipp/advanced/super-admin/cipp-users",
-      "/cipp/advanced/super-admin/container",
-      "/cipp/advanced/super-admin/custom-domains",
-      "/cipp/advanced/container-logs",
-      "/cipp/advanced/worker-health"
+      "/cipp/advanced/authentication/cipp-users",
+      "/cipp/advanced/container-management/status",
+      "/cipp/advanced/container-management/custom-domains",
+      "/cipp/advanced/container-management/logs",
+      "/cipp/advanced/container-management/worker-health"
     ],
     "Hidden": true
   },
@@ -53,9 +51,7 @@
     "Enabled": false,
     "AllowUserToggle": true,
     "Timers": [],
-    "Endpoints": [
-      "ExecMcp"
-    ],
+    "Endpoints": ["ExecMcp"],
     "Pages": [],
     "Hidden": false
   },
@@ -66,12 +62,8 @@
     "Enabled": true,
     "AllowUserToggle": false,
     "Timers": [],
-    "Endpoints": [
-      "ExecAppInsightsQuery"
-    ],
-    "Pages": [
-      "/cipp/advanced/diagnostics"
-    ],
+    "Endpoints": ["ExecAppInsightsQuery"],
+    "Pages": ["/cipp/advanced/diagnostics"],
     "Hidden": true
   },
   {
@@ -81,12 +73,8 @@
     "Enabled": true,
     "AllowUserToggle": false,
     "Timers": [],
-    "Endpoints": [
-      "ExecBackendURLs"
-    ],
-    "Pages": [
-      "/cipp/settings/backend"
-    ],
+    "Endpoints": ["ExecBackendURLs"],
+    "Pages": ["/cipp/settings/backend"],
     "Hidden": true
   },
   {
@@ -96,12 +84,36 @@
     "Enabled": true,
     "AllowUserToggle": false,
     "Timers": [],
-    "Endpoints": [
-      "ExecOffloadFunctions"
+    "Endpoints": ["ExecOffloadFunctions"],
+    "Pages": ["/cipp/advanced/super-admin/function-offloading"],
+    "Hidden": true
+  },
+  {
+    "Id": "Baselines",
+    "Name": "Baselines",
+    "Description": "This is pre-alpha do not enable in production. The drift-first baseline engine that replaces classic Standards and Drift. Enables the scheduled baseline run and the Baselines menu, hides the classic Standards and Drift pages, and skips the scheduled classic Standards and Drift runs - the two systems never run side by side.",
+    "Enabled": false,
+    "AllowUserToggle": true,
+    "Timers": ["9f2c7b1e-4a6d-4c3f-8b9a-5e1d2f7c0a44"],
+    "Endpoints": [],
+    "Pages": ["/tenant/baselines"],
+    "HidesPages": [
+      "/tenant/standards/alignment",
+      "/tenant/manage/drift",
+      "/tenant/manage/applied-standards",
+      "/tenant/manage/policies-deployed"
     ],
-    "Pages": [
-      "/cipp/advanced/super-admin/function-offloading"
-    ],
+    "Hidden": false
+  },
+  {
+    "Id": "CertificateAuthentication",
+    "Name": "Certificate Authentication",
+    "Description": "Authenticate CIPP's SAM application with the SAM certificate instead of the client secret for every Graph and Exchange Online call (app-only and delegated). Managed from the Setup Wizard - enable it for an existing install (the client secret is kept as a rollback) or provision a secret-less install from scratch.",
+    "Enabled": false,
+    "AllowUserToggle": false,
+    "Timers": [],
+    "Endpoints": [],
+    "Pages": [],
     "Hidden": true
   }
 ]

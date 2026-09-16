@@ -68,14 +68,18 @@ function Invoke-CIPPStandardDisableInactiveUsers {
             if ($user.signInActivity.lastSuccessfulSignInDateTime) {
                 $lastSignIn = [datetime]$user.signInActivity.lastSuccessfulSignInDateTime
                 if ($lastSignIn.ToUniversalTime() -le $Days) {
-                    $user | Add-Member -NotePropertyName 'EnrichedLastSignInDateTime' -NotePropertyValue $user.signInActivity.lastSuccessfulSignInDateTime -Force
-                    $user | Add-Member -NotePropertyName 'NeverSignedIn' -NotePropertyValue $false -Force
+                    $user | Add-Member -NotePropertyMembers ([ordered]@{
+                            EnrichedLastSignInDateTime = $user.signInActivity.lastSuccessfulSignInDateTime
+                            NeverSignedIn              = $false
+                        }) -Force
                     $user
                 }
             } else {
                 # signInActivity present but no successful sign-in; createdDateTime already <= $Days via server-side filter
-                $user | Add-Member -NotePropertyName 'EnrichedLastSignInDateTime' -NotePropertyValue $null -Force
-                $user | Add-Member -NotePropertyName 'NeverSignedIn' -NotePropertyValue $true -Force
+                $user | Add-Member -NotePropertyMembers ([ordered]@{
+                        EnrichedLastSignInDateTime = $null
+                        NeverSignedIn              = $true
+                    }) -Force
                 $user
             }
         }
@@ -86,7 +90,7 @@ function Invoke-CIPPStandardDisableInactiveUsers {
         return
     }
 
-    $AuditResults = New-GraphGetRequest -uri "https://graph.microsoft.com/beta/auditLogs/directoryAudits?`$filter=activityDisplayName eq 'Enable account' and activityDateTime ge $AuditLookup" -scope 'https://graph.microsoft.com/.default' -tenantid $Tenant
+    $AuditResults = New-GraphGetRequest -uri "https://graph.microsoft.com/beta/auditLogs/directoryAudits?`$filter=activityDisplayName eq 'Enable account' and activityDateTime ge $AuditLookup&`$select=targetResources" -scope 'https://graph.microsoft.com/.default' -tenantid $Tenant
     $RecentlyReactivatedUsers = @(foreach ($AuditEntry in $AuditResults) { $AuditEntry.targetResources[0].id }) | Select-Object -Unique
 
     $GraphRequest = @($GraphRequest | Where-Object { -not ($RecentlyReactivatedUsers -contains $_.id) })

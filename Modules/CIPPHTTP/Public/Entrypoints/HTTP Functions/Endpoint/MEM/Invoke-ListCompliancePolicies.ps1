@@ -1,4 +1,4 @@
-﻿function Invoke-ListCompliancePolicies {
+function Invoke-ListCompliancePolicies {
     <#
     .FUNCTIONALITY
         Entrypoint
@@ -15,10 +15,10 @@
     Write-LogMessage -headers $Headers -API $APIName -message 'Accessed this API' -Sev 'Debug'
 
     $TenantFilter = $Request.Query.tenantFilter
-    $UseReportDB = $Request.Query.UseReportDB
-
+    # Serve from the reporting database cache instead of live Graph. Much faster, especially for AllTenants.
+    $UseReportDB = $Request.Query.UseReportDB -eq $true
     try {
-        if ($TenantFilter -eq 'AllTenants' -or $UseReportDB -eq 'true') {
+        if ($TenantFilter -eq 'AllTenants' -or $UseReportDB) {
             try {
                 $GraphRequest = Get-CIPPIntuneCompliancePolicyReport -TenantFilter $TenantFilter -ErrorAction Stop
                 $StatusCode = [HttpStatusCode]::OK
@@ -91,9 +91,11 @@
                 }
             }
 
-            $Policy | Add-Member -NotePropertyName 'PolicyTypeName' -NotePropertyValue $policyType -Force
-            $Policy | Add-Member -NotePropertyName 'PolicyAssignment' -NotePropertyValue ($PolicyAssignment -join ', ') -Force
-            $Policy | Add-Member -NotePropertyName 'PolicyExclude' -NotePropertyValue ($PolicyExclude -join ', ') -Force
+            $Policy | Add-Member -NotePropertyMembers ([ordered]@{
+                    PolicyTypeName   = $policyType
+                    PolicyAssignment = ($PolicyAssignment -join ', ')
+                    PolicyExclude    = ($PolicyExclude -join ', ')
+                }) -Force
 
             $GraphRequest.Add($Policy)
         }

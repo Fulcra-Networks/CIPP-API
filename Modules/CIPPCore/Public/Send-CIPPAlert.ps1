@@ -18,6 +18,9 @@ function Send-CIPPAlert {
         $RowKey = [string][guid]::NewGuid(),
         $Attachments,
         $AffectedUser,
+        $PsaTicketPriority,
+        $PSAReference,
+        $PSATicketId,
         [switch]$UseStandardizedSchema
     )
     Write-Information 'Shipping Alert'
@@ -268,57 +271,68 @@ function Send-CIPPAlert {
                     if ($RequestHeaders.Count -gt 0) {
                         $RestMethod['Headers'] = $RequestHeaders
                     }
-                    switch -wildcard ($webhook) {
-                        '*webhook.office.com*' {
-                            if ($UseStandardizedWebhookSchema) {
-                                $RestMethod['Body'] = $ReplacedContent
-                                $WebhookResponse = Invoke-CIPPRestMethod @RestMethod
-                            }
-                            else {
-                                $TeamsBody = [PSCustomObject]@{
-                                    text = "You've setup your alert policies to be alerted whenever specific events happen. We've found some of these events in the log. <br><br>$ReplacedContent"
-                                } | ConvertTo-Json -Compress
-                                $RestMethod['Body'] = $TeamsBody
-                                $WebhookResponse = Invoke-CIPPRestMethod @RestMethod
-                            }
-                        }
-                        '*discord.com*' {
-                            if ($UseStandardizedWebhookSchema) {
-                                $RestMethod['Body'] = $ReplacedContent
-                                $WebhookResponse = Invoke-CIPPRestMethod @RestMethod
-                            }
-                            else {
-                                $DiscordBody = [PSCustomObject]@{
-                                    content = "You've setup your alert policies to be alerted whenever specific events happen. We've found some of these events in the log. ``````$ReplacedContent``````"
-                                } | ConvertTo-Json -Compress
-                                $RestMethod['Body'] = $DiscordBody
-                                $WebhookResponse = Invoke-CIPPRestMethod @RestMethod
-                            }
-                        }
-                        '*slack.com*' {
-                            if ($UseStandardizedWebhookSchema) {
-                                $RestMethod['Body'] = $ReplacedContent
-                                $WebhookResponse = Invoke-CIPPRestMethod @RestMethod
-                            }
-                            else {
-                                $SlackBlocks = Get-SlackAlertBlocks -JSONBody $JSONContent
-                                if ($SlackBlocks.blocks) {
-                                    $SlackBody = $SlackBlocks | ConvertTo-Json -Depth 10 -Compress
-                                }
-                                else {
-                                    $SlackBody = [PSCustomObject]@{
-                                        text = "You've setup your alert policies to be alerted whenever specific events happen. We've found some of these events in the log. ``````$ReplacedContent``````"
+                    $MaxRetries = 3
+                    $RetryCount = 0
+                    $RequestSuccessful = $false
+                    do {
+                        switch -wildcard ($webhook) {
+                            '*webhook.office.com*' {
+                                if ($UseStandardizedWebhookSchema) {
+                                    $RestMethod['Body'] = $ReplacedContent
+                                    $WebhookResponse = Invoke-CIPPRestMethod @RestMethod
+                                } else {
+                                    $TeamsBody = [PSCustomObject]@{
+                                        text = "You've setup your alert policies to be alerted whenever specific events happen. We've found some of these events in the log. <br><br>$ReplacedContent"
                                     } | ConvertTo-Json -Compress
+                                    $RestMethod['Body'] = $TeamsBody
+                                    $WebhookResponse = Invoke-CIPPRestMethod @RestMethod
                                 }
-                                $RestMethod['Body'] = $SlackBody
+                            }
+                            '*discord.com*' {
+                                if ($UseStandardizedWebhookSchema) {
+                                    $RestMethod['Body'] = $ReplacedContent
+                                    $WebhookResponse = Invoke-CIPPRestMethod @RestMethod
+                                } else {
+                                    $DiscordBody = [PSCustomObject]@{
+                                        content = "You've setup your alert policies to be alerted whenever specific events happen. We've found some of these events in the log. ``````$ReplacedContent``````"
+                                    } | ConvertTo-Json -Compress
+                                    $RestMethod['Body'] = $DiscordBody
+                                    $WebhookResponse = Invoke-CIPPRestMethod @RestMethod
+                                }
+                            }
+                            '*slack.com*' {
+                                if ($UseStandardizedWebhookSchema) {
+                                    $RestMethod['Body'] = $ReplacedContent
+                                    $WebhookResponse = Invoke-CIPPRestMethod @RestMethod
+                                } else {
+                                    $SlackBlocks = Get-SlackAlertBlocks -JSONBody $JSONContent
+                                    if ($SlackBlocks.blocks) {
+                                        $SlackBody = $SlackBlocks | ConvertTo-Json -Depth 10 -Compress
+                                    } else {
+                                        $SlackBody = [PSCustomObject]@{
+                                            text = "You've setup your alert policies to be alerted whenever specific events happen. We've found some of these events in the log. ``````$ReplacedContent``````"
+                                        } | ConvertTo-Json -Compress
+                                    }
+                                    $RestMethod['Body'] = $SlackBody
+                                    $WebhookResponse = Invoke-CIPPRestMethod @RestMethod
+                                }
+                            }
+                            default {
+                                $RestMethod['Body'] = $ReplacedContent
                                 $WebhookResponse = Invoke-CIPPRestMethod @RestMethod
                             }
                         }
-                        default {
-                            $RestMethod['Body'] = $ReplacedContent
-                            $WebhookResponse = Invoke-CIPPRestMethod @RestMethod
+                        if ($WebhookStatusCode -eq 429) {
+                            $RetryCount++
+                            if ($RetryCount -le $MaxRetries) {
+                                $WaitSeconds = Get-Random -Minimum 2 -Maximum 5
+                                Write-LogMessage -API 'Webhook Alerts' -message "Webhook rate limited (429) for $webhook, retrying in $WaitSeconds seconds (attempt $RetryCount/$MaxRetries)" -tenant $TenantFilter -sev warning
+                                Start-Sleep -Seconds $WaitSeconds
+                            }
+                        } else {
+                            $RequestSuccessful = $true
                         }
-                    }
+                    } while (-not $RequestSuccessful -and $RetryCount -le $MaxRetries)
                 }
                 $LogData = @{
                     WebhookUrl = $webhook
@@ -351,31 +365,58 @@ function Send-CIPPAlert {
     if ($Type -eq 'psa') {
         Write-Information 'Trying to send to PSA'
         if (-not $config.sendtoIntegration) {
+            # The extension test button bypasses this gate, so log the skip where the operator looks.
             Write-Information 'PSA delivery skipped: sendtoIntegration is disabled in CippNotifications config. Enable it under Settings -> Notifications to route alerts to your PSA.'
-            return
+            Write-LogMessage -API 'Webhook Alerts' -tenant $TenantFilter -message "PSA delivery skipped for '$Title': 'Send to integration' is off under Settings > Notifications, so no PSA ticket was raised." -sev Warning
+            return 'Skipped: PSA delivery is disabled in the notification settings'
         }
         if ($PSCmdlet.ShouldProcess('PSA', 'Sending alert')) {
             try {
+                # Tag every CIPP-generated PSA ticket title with a "[CIPP]" prefix so technicians
+                # can filter, group and search for them in HaloPSA's ticket views with one query.
+                # The prefix is only added on the PSA path - email and webhook subjects keep the
+                # untouched title to preserve existing recipient inbox rules.
+                $PsaTitle = if ($Title -match '^\[CIPP\]\s') { "$Title" } else { "[CIPP] $Title" }
                 $Alert = @{
                     TenantId   = $TenantFilter
                     AlertText  = "$HTMLContent"
-                    AlertTitle = "$($Title)"
                     AlertJSON  = $JSONContent
+                    AlertTitle = "$PsaTitle"
+                }
+                if ($PSAReference) {
+                    # Passed through verbatim - what a reference means is the PSA extension's call.
+                    $Alert.Reference = $PSAReference
+                    Write-Information "PSA alert reference: $PSAReference"
+                }
+                if ($PSATicketId) {
+                    $Alert.PsaTicketId = $PSATicketId
+                    Write-Information "PSA alert target ticket: $PSATicketId"
                 }
                 if ($AffectedUser) {
                     $Alert.AffectedUser = $AffectedUser
                     $UserLabel = if ($AffectedUser.UPN) { $AffectedUser.UPN } elseif ($AffectedUser.AzureOID) { "OID:$($AffectedUser.AzureOID)" } else { 'unknown' }
                     Write-Information "PSA alert AffectedUser: $UserLabel"
                 }
-                $PsaResult = New-CippExtAlert -Alert $Alert
-                if ($PsaResult) {
-                    Write-Information "PSA result: $PsaResult"
+                if ($PsaTicketPriority) {
+                    $Alert.PsaTicketPriority = $PsaTicketPriority
+                    Write-Information "PSA alert priority override: $PsaTicketPriority"
+                }
+                # Extensions report failure in their return value, one line per extension.
+                $PsaOutput = @(New-CippExtAlert -Alert $Alert)
+                $PsaResult = ($PsaOutput -join ' ').Trim()
+                $Failure = (@($PsaOutput | Where-Object { "$_" -match '^(Failed|Error)' }) -join ' ').Trim()
+                if ($Failure) {
+                    Write-LogMessage -API 'Webhook Alerts' -tenant $TenantFilter -message "PSA delivery failed for '$Title': $Failure" -sev Error
+                    return "Error: $Failure"
                 }
                 Write-LogMessage -API 'Webhook Alerts' -tenant $TenantFilter -message "Sent PSA alert $title" -sev info
+                # Same shape as the email and webhook branches; the text carries the ticket id.
+                return "Sent PSA alert: $title$(if ($PsaResult) { " - $PsaResult" })"
             } catch {
                 $ErrorMessage = Get-CippException -Exception $_
                 Write-Information "Could not send alerts to ticketing system: $($ErrorMessage.NormalizedError)"
                 Write-LogMessage -API 'Webhook Alerts' -tenant $TenantFilter -message "Could not send alerts to ticketing system: $($ErrorMessage.NormalizedError)" -sev Error -LogData $ErrorMessage
+                return "Error: Could not send alerts to ticketing system: $($ErrorMessage.NormalizedError)"
             }
         }
     }

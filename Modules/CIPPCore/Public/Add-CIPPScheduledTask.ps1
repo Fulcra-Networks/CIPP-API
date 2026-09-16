@@ -38,7 +38,8 @@ function Add-CIPPScheduledTask {
                 $ExistingTask.TaskState = 'Planned'
                 Add-CIPPAzDataTableEntity @Table -Entity $ExistingTask -Force
                 Write-LogMessage -headers $Headers -API 'RunNow' -message "Task $($ExistingTask.Name) scheduled to run now" -Sev 'Info' -Tenant $ExistingTask.Tenant
-                Add-CippQueueMessage -Cmdlet 'Start-UserTasksOrchestrator' -Parameters @{
+                # Add-CippQueueMessage returns $true; without discarding it the caller's Results array shows a bare 'true'
+                $null = Add-CippQueueMessage -Cmdlet 'Start-UserTasksOrchestrator' -Parameters @{
                     TaskId = $RowKey
                 }
                 return "Task $($ExistingTask.Name) scheduled to run now"
@@ -58,7 +59,7 @@ function Add-CIPPScheduledTask {
                 $Filter = "PartitionKey eq 'ScheduledTask' and Name eq '$($Task.Name)' and TaskState ne 'Completed' and TaskState ne 'Failed'"
                 $ExistingTask = (Get-CIPPAzDataTableEntity @Table -Filter $Filter)
                 if ($ExistingTask) {
-                    return "Task with name $($Task.Name) already exists"
+                    return "Error - A scheduled task named '$($Task.Name)' already exists and was not created again."
                 }
             }
 
@@ -147,7 +148,6 @@ function Add-CIPPScheduledTask {
                 $Parameters.Headers = $Headers | Select-Object -Property 'x-forwarded-for', 'x-ms-client-principal', 'x-ms-client-principal-idp', 'x-ms-client-principal-name'
             }
 
-            $Parameters = ($Parameters | ConvertTo-Json -Depth 10 -Compress)
             $AdditionalProperties = [System.Collections.Hashtable]@{}
             foreach ($Prop in $task.AdditionalProperties) {
                 if ($null -eq $Prop.Value -or $Prop.Value -eq '' -or ($Prop.Value | Measure-Object).Count -eq 0) {
@@ -156,7 +156,6 @@ function Add-CIPPScheduledTask {
                 $AdditionalProperties[$Prop.Key] = $Prop.Value
             }
             $AdditionalProperties = ([PSCustomObject]$AdditionalProperties | ConvertTo-Json -Compress)
-            if ($Parameters -eq 'null') { $Parameters = '' }
 
 
             $Recurrence = if ([string]::IsNullOrEmpty($task.Recurrence.value)) {
@@ -223,6 +222,22 @@ function Add-CIPPScheduledTask {
                 }
             }
 
+            # Stored parameters are user input: strip any tenant-identifying parameter so the
+            # authorized task tenant is injected at execution instead of a stored value, and log
+            # when the stored value pointed somewhere other than the picked tenant.
+            foreach ($TenantParamName in @('TenantFilter', 'Tenant', 'TenantId')) {
+                if (-not $Parameters.ContainsKey($TenantParamName)) { continue }
+                $StoredTenantValue = $Parameters[$TenantParamName]
+                $StoredTenantString = [string]($StoredTenantValue.value ?? $StoredTenantValue)
+                if (![string]::IsNullOrWhiteSpace($StoredTenantString) -and $StoredTenantString -ne [string]$tenantFilter) {
+                    Write-LogMessage -headers $Headers -API 'ScheduledTask' -message "Task $($task.Name): parameter -$TenantParamName value '$StoredTenantString' does not match the selected tenant '$tenantFilter' and was removed; the task runs against the selected tenant." -Sev 'Error' -Tenant $tenantFilter
+                }
+                $Parameters.Remove($TenantParamName)
+            }
+
+            $Parameters = ($Parameters | ConvertTo-Json -Depth 10 -Compress)
+            if ($Parameters -eq 'null') { $Parameters = '' }
+
             $entity = @{
                 PartitionKey         = [string]'ScheduledTask'
                 TaskState            = [string]'Planned'
@@ -243,11 +258,21 @@ function Add-CIPPScheduledTask {
                 AlertComment         = [string]$task.AlertComment
                 CustomSubject        = [string]$task.CustomSubject
                 PsaTicketStrategy    = [string]($task.PsaTicketStrategy.value ?? $task.PsaTicketStrategy)
+                PsaTicketPriority    = [string]($task.PsaTicketPriority.value ?? $task.PsaTicketPriority)
+                PsaTicketId          = [string]($task.PsaTicketId.value ?? $task.PsaTicketId)
             }
 
 
             if ($task.Tag) {
                 $entity['Tag'] = [string]$task.Tag
+            }
+
+            if ($Task.RowKey) {
+                # Editing replaces the entity, so carry the disabled state over to keep a disabled task disabled
+                $ExistingEntity = Get-CIPPAzDataTableEntity @Table -Filter "PartitionKey eq 'ScheduledTask' and RowKey eq '$RowKey'" -Property RowKey, Disabled
+                if ($ExistingEntity.Disabled -eq $true) {
+                    $entity['Disabled'] = $true
+                }
             }
 
             # Always store DesiredStartTime if provided
@@ -270,35 +295,25 @@ function Add-CIPPScheduledTask {
                 }
             }
 
+            # Stored verbatim so the orchestrator expands groups at run time. The version marker tells
+            # it excludedTenants holds only the operator's picks, not a snapshot of unselected tenants.
+            if ($task.Tenants) {
+                $entity['Tenants'] = $task.Tenants -is [string] ? [string]$task.Tenants : [string]($task.Tenants | ConvertTo-Json -Compress -Depth 10)
+                $entity['TenantSelectionVersion'] = 2
+            }
+
             if ($task.Trigger) {
                 $entity.Trigger = [string]($task.Trigger | ConvertTo-Json -Compress)
                 $TriggerType = $task.Trigger.Type.value ?? $task.Trigger.Type
                 if ($TriggerType -eq 'DeltaQuery') {
-                    $Parameters = @{}
-                    if ($task.Trigger.WatchedAttributes -and ($task.Trigger.WatchedAttributes | Measure-Object).Count -gt 0) {
-                        $Parameters.'$select' = $task.Trigger.WatchedAttributes | ForEach-Object { $_.value ?? $_ } -join ','
-                    }
-                    if ($task.Trigger.ResourceFilter) {
-                        $ResourceFilterValues = $task.Trigger.ResourceFilter | ForEach-Object { $_.value ?? $_ }
-                        $Parameters.'$filter' = "id eq '" + ($ResourceFilterValues -join "' or id eq '") + "'"
-                    }
                     $Resource = $task.Trigger.DeltaResource.value ?? $task.Trigger.DeltaResource
-
-                    if ($entity.TenantGroup) {
-                        $tenantFilter = $entity.TenantGroup | ConvertFrom-Json
-                    }
-                    $DeltaQuery = @{
-                        TenantFilter = $tenantFilter
-                        Resource     = $Resource
-                        Parameters   = $Parameters
-                        PartitionKey = $RowKey
-                    }
+                    $DeltaTenantFilter = if ($entity.TenantGroup) { $entity.TenantGroup | ConvertFrom-Json } else { $tenantFilter }
 
                     try {
-                        $null = New-GraphDeltaQuery @DeltaQuery
+                        $null = New-CIPPTaskDeltaQuery -Trigger $task.Trigger -TenantFilter $DeltaTenantFilter -PartitionKey $RowKey
                         Write-Information "Created delta query for resource $($Resource)"
                     } catch {
-                        Write-Warning "Failed to create delta query for resource $($Resource): $($_.Exception.Message)"
+                        throw "Failed to create delta query for resource $($Resource): $($_.Exception.Message)"
                     }
                 }
             }
@@ -355,7 +370,8 @@ function Add-CIPPScheduledTask {
             }
 
             if ($RunNow.IsPresent) {
-                Add-CippQueueMessage -Cmdlet 'Start-UserTasksOrchestrator' -Parameters @{
+                # Add-CippQueueMessage returns $true; without discarding it the caller's Results array shows a bare 'true'
+                $null = Add-CippQueueMessage -Cmdlet 'Start-UserTasksOrchestrator' -Parameters @{
                     TaskId = $RowKey
                 }
                 return "Task $($entity.Name) scheduled to run now"

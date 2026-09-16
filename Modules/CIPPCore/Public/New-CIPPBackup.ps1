@@ -54,6 +54,7 @@ function New-CIPPBackup {
                         'Extensions'
                         'WebhookRules'
                         'ScheduledTasks'
+                        'DeltaQueries'
                         'TenantProperties'
                         'TenantGroups'
                         'TenantGroupMembers'
@@ -125,7 +126,7 @@ function New-CIPPBackup {
         try {
             $containers = @()
             try { $containers = New-CIPPAzStorageRequest -Service 'blob' -Component 'list' -ConnectionString $ConnectionString } catch { $containers = @() }
-            $exists = ($containers | Where-Object { $_.Name -eq $ContainerName }) -ne $null
+            $exists = $null -ne ($containers | Where-Object { $_.Name -eq $ContainerName })
             if (-not $exists) {
                 $null = New-CIPPAzStorageRequest -Service 'blob' -Resource $ContainerName -Method 'PUT' -QueryParams @{ restype = 'container' } -ConnectionString $ConnectionString
                 Start-Sleep -Milliseconds 500

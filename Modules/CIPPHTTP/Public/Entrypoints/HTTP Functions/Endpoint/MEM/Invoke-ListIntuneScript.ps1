@@ -15,7 +15,8 @@ function Invoke-ListIntuneScript {
     Write-LogMessage -Headers $Headers -API $APIName -message 'Accessed this API' -Sev Debug
 
     $TenantFilter = $Request.Query.tenantFilter
-    $UseReportDB = $Request.Query.UseReportDB
+    # Serve from the reporting database cache instead of live Graph. Much faster, especially for AllTenants.
+    $UseReportDB = $Request.Query.UseReportDB -eq $true
     $Results = [System.Collections.Generic.List[System.Object]]::new()
 
     $BulkRequests = @(
@@ -47,7 +48,7 @@ function Invoke-ListIntuneScript {
     )
 
     try {
-        if ($TenantFilter -eq 'AllTenants' -or $UseReportDB -eq 'true') {
+        if ($TenantFilter -eq 'AllTenants' -or $UseReportDB) {
             try {
                 $Results = Get-CIPPIntuneScriptReport -TenantFilter $TenantFilter -ErrorAction Stop
                 $StatusCode = [HttpStatusCode]::OK
@@ -113,8 +114,10 @@ function Invoke-ListIntuneScript {
                 }
             }
 
-            $script | Add-Member -NotePropertyName 'ScriptAssignment' -NotePropertyValue ($ScriptAssignment -join ', ') -Force
-            $script | Add-Member -NotePropertyName 'ScriptExclude' -NotePropertyValue ($ScriptExclude -join ', ') -Force
+            $script | Add-Member -NotePropertyMembers ([ordered]@{
+                    ScriptAssignment = ($ScriptAssignment -join ', ')
+                    ScriptExclude    = ($ScriptExclude -join ', ')
+                }) -Force
         }
 
         $scripts | Add-Member -MemberType NoteProperty -Name scriptType -Value $scriptId
