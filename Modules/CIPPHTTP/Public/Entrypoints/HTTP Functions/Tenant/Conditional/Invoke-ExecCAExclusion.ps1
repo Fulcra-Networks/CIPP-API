@@ -74,7 +74,7 @@ function Invoke-ExecCAExclusion {
         }
 
         $PolicyName = $Policy.displayName
-        if ($Request.Body.vacation -eq 'true') {
+        if ($Request.Body.vacation -eq $true) {
             $StartDate = $Request.Body.StartDate
             $EndDate = $Request.Body.EndDate
             # Detect if policy targets specific named locations (GUIDs) and user requested audit log exclusion
@@ -185,12 +185,15 @@ function Invoke-ExecCAExclusion {
                     Reference     = $Request.Body.reference
                 }
                 Add-CIPPScheduledTask -Task $TravelRemoveTask -hidden $false
-                $Results += "Successfully scheduled temporary travel policy '$TravelPolicyName' restricting sign-ins to $($TravelCountries -join ', '). The policy and named location will be removed at the end date."
+                $TravelResult = "Successfully scheduled temporary travel policy '$TravelPolicyName' restricting sign-ins to $($TravelCountries -join ', '). The policy and named location will be removed at the end date."
+                Write-LogMessage -headers $Headers -API 'Invoke-ExecCAExclusion' -message $TravelResult -Sev 'Info' -tenant $TenantFilter
+                $Results += $TravelResult
             }
 
             if ($DuplicateGroupWarning) {
                 $Results += $DuplicateGroupWarning
             }
+            Write-LogMessage -headers $Headers -API 'Invoke-ExecCAExclusion' -message "Successfully added vacation mode schedule for $Username on policy '$PolicyName'." -Sev 'Info' -tenant $TenantFilter
             $body = @{ Results = $Results }
         } else {
             $Parameters = @{

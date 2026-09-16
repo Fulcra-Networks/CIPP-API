@@ -124,8 +124,10 @@ function Invoke-ExecSharePointTemplate {
             $Body = $Templates | ForEach-Object {
                 $TemplateData = $_.JSON | ConvertFrom-Json
                 $OutputObject = $TemplateData | Select-Object -Property *
-                $OutputObject | Add-Member -NotePropertyName 'TemplateId' -NotePropertyValue $_.RowKey -Force
-                $OutputObject | Add-Member -NotePropertyName 'Timestamp' -NotePropertyValue $_.Timestamp.DateTime.ToString('yyyy-MM-ddTHH:mm:ssZ') -Force
+                $OutputObject | Add-Member -NotePropertyMembers ([ordered]@{
+                        TemplateId = $_.RowKey
+                        Timestamp  = $_.Timestamp.DateTime.ToString('yyyy-MM-ddTHH:mm:ssZ')
+                    }) -Force
                 return $OutputObject
             }
         }
@@ -141,6 +143,12 @@ function Invoke-ExecSharePointTemplate {
                 $TenantFilter = $Request.Body.tenantFilter
                 if ([string]::IsNullOrWhiteSpace($TenantFilter)) {
                     throw 'A tenant is required to deploy this template.'
+                }
+
+                # AnyTenant: deployment provisions sites in this tenant; enforce scope
+                $AllowedTenants = Test-CIPPAccess -Request $Request -TenantList
+                if ($AllowedTenants -notcontains 'AllTenants' -and -not (Get-Tenants -TenantFilter $TenantFilter)) {
+                    throw 'Access to this tenant is not allowed'
                 }
 
                 # Pre-create a status row so the frontend can poll live progress from queue time.
@@ -192,8 +200,10 @@ function Invoke-ExecSharePointTemplate {
             $Body = $Templates | ForEach-Object {
                 $TemplateData = $_.JSON | ConvertFrom-Json
                 $OutputObject = $TemplateData | Select-Object -Property *
-                $OutputObject | Add-Member -NotePropertyName 'TemplateId' -NotePropertyValue $_.RowKey -Force
-                $OutputObject | Add-Member -NotePropertyName 'Timestamp' -NotePropertyValue $_.Timestamp.DateTime.ToString('yyyy-MM-ddTHH:mm:ssZ') -Force
+                $OutputObject | Add-Member -NotePropertyMembers ([ordered]@{
+                        TemplateId = $_.RowKey
+                        Timestamp  = $_.Timestamp.DateTime.ToString('yyyy-MM-ddTHH:mm:ssZ')
+                    }) -Force
                 return $OutputObject
             }
         }

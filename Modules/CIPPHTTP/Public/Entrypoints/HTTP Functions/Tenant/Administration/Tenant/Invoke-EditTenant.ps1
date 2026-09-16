@@ -20,6 +20,14 @@ function Invoke-EditTenant {
     $PropertiesTable = Get-CippTable -TableName 'TenantProperties'
     $Existing = Get-CIPPAzDataTableEntity @PropertiesTable -Filter "PartitionKey eq '$customerId'"
     $Tenant = Get-Tenants -TenantFilter $customerId
+    # AnyTenant: Get-Tenants is narrowed to the caller's allowed tenants; no match means
+    # unknown or out-of-scope, either way nothing may be written
+    if (-not $Tenant) {
+        return ([HttpResponseContext]@{
+                StatusCode = [HttpStatusCode]::Forbidden
+                Body       = @{ Results = "Tenant '$customerId' not found or access denied" }
+            })
+    }
     $TenantTable = Get-CippTable -TableName 'Tenants'
     $GroupMembersTable = Get-CippTable -TableName 'TenantGroupMembers'
 
@@ -30,6 +38,7 @@ function Invoke-EditTenant {
                 Write-Host 'Removing alias'
                 Remove-CIPPAzDataTableEntity @PropertiesTable -Entity $AliasEntity
                 $null = Get-Tenants -TenantFilter $customerId -TriggerRefresh
+                Write-LogMessage -headers $Headers -API $APIName -tenant $Tenant.defaultDomainName -TenantId $Tenant.customerId -message "Removed tenant alias for $($Tenant.defaultDomainName)" -Sev 'Info'
             }
         } else {
             $aliasEntity = @{
@@ -42,11 +51,16 @@ function Invoke-EditTenant {
             $Tenant | Add-Member -NotePropertyName 'originalDisplayName' -NotePropertyValue $tenant.displayName -Force
             $Tenant.displayName = $tenantAlias
             $null = Add-CIPPAzDataTableEntity @TenantTable -Entity $Tenant -Force
+            Write-LogMessage -headers $Headers -API $APIName -tenant $Tenant.defaultDomainName -TenantId $Tenant.customerId -message "Set tenant alias to '$tenantAlias'" -Sev 'Info'
         }
 
         # Update tenant groups
         $GroupTable = Get-CippTable -TableName 'TenantGroups'
-        $StaticGroups = Get-CIPPAzDataTableEntity @GroupTable -Filter "PartitionKey eq 'TenantGroup' and GroupType ne 'dynamic'"
+        # Table-service comparisons skip entities missing the property, so a server-side
+        # "GroupType ne 'dynamic'" drops static groups created before GroupType existed and
+        # they can never be added or removed here - treat a missing GroupType as static instead
+        $AllGroups = Get-CIPPAzDataTableEntity @GroupTable -Filter "PartitionKey eq 'TenantGroup'"
+        $StaticGroups = $AllGroups | Where-Object { $_.GroupType -ne 'dynamic' }
         $StaticGroupIds = $StaticGroups.RowKey
         $CurrentGroupMemberships = Get-CIPPAzDataTableEntity @GroupMembersTable -Filter "customerId eq '$customerId'"
         foreach ($Group in $tenantGroups) {

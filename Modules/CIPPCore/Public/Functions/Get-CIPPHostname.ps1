@@ -11,6 +11,14 @@ function Get-CIPPHostname {
         The request headers, usually $Request.Headers. Optional - omit for non-HTTP contexts.
     .PARAMETER Save
         Persist the resolved hostname to Config/InstanceProperties/CIPPURL so background jobs pick up the current URL.
+    .PARAMETER PreferCustomDomain
+        Resolve from the custom domain bound to the App Service ahead of the inbound request.
+        Use it for anything that outlives the request - webhook registrations, stored URLs - so
+        an admin who happens to browse in on the *.azurewebsites.net hostname does not pin
+        background work to it. Only a custom domain takes precedence: when none is bound to the
+        App Service the inbound request still decides, so a Static Web App deployment (custom
+        domain on the SWA, API as a linked backend) keeps generating links on the domain the
+        user is actually on rather than the platform hostname.
     .FUNCTIONALITY
         Internal
     .EXAMPLE
@@ -19,12 +27,36 @@ function Get-CIPPHostname {
     [CmdletBinding()]
     param(
         $Headers,
-        [switch]$Save
+        [switch]$Save,
+        [switch]$PreferCustomDomain
     )
 
     $Hostname = $null
 
-    if ($Headers) {
+    # Only an authoritative ARM answer that found a custom domain wins here. When the lookup fails
+    # we fall through to the request host rather than guessing: demoting a working custom domain to
+    # the platform hostname on a transient 403 would silently rewrite every link CIPP sends out.
+    # The same applies when ARM answers but no custom domain is bound: behind a Static Web App the
+    # custom domain lives on the SWA, so the function app's own hostname is never user-facing.
+    if ($PreferCustomDomain.IsPresent) {
+        try {
+            $SiteState = Get-CIPPSiteHostname -IncludeStatus -NoFallback
+            if ($SiteState.Discovered -and $SiteState.CustomHostnames.Count -gt 0 -and ![string]::IsNullOrWhiteSpace($SiteState.PreferredHostname)) {
+                $Hostname = $SiteState.PreferredHostname
+                if ($SiteState.CustomHostnames.Count -gt 1) {
+                    Write-Information "Get-CIPPHostname: $($SiteState.CustomHostnames.Count) custom domains bound ($($SiteState.CustomHostnames -join ', ')) - using the first, '$Hostname'"
+                }
+            } elseif ($SiteState.Discovered) {
+                Write-Information 'Get-CIPPHostname: no custom domain is bound to this App Service - falling back to the request host'
+            } else {
+                Write-Information "Get-CIPPHostname: custom domain lookup was not authoritative, falling back to the request host: $($SiteState.Error)"
+            }
+        } catch {
+            Write-Information "Get-CIPPHostname: custom domain lookup failed: $($_.Exception.Message)"
+        }
+    }
+
+    if (!$Hostname -and $Headers) {
         # x-ms-original-url carries the full URL the client requested, including any custom domain
         $Candidates = @(
             $Headers.'x-ms-original-url'

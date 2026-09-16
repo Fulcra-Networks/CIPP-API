@@ -38,17 +38,27 @@ function Invoke-AddAlert {
         $Actions = $Request.Body.actions | ConvertTo-Json -Compress -Depth 10 | Out-String
         $RowKey = $Request.Body.RowKey ? $Request.Body.RowKey : (New-Guid).ToString()
         $CompleteObject = @{
-            Tenants         = [string]$TenantsJson
-            excludedTenants = [string]$excludedTenantsJson
-            Conditions      = [string]$Conditions
-            Actions         = [string]$Actions
-            type            = $Request.Body.logbook.value
-            RowKey          = $RowKey
-            PartitionKey    = 'Webhookv2'
-            AlertComment    = [string]$Request.Body.AlertComment
-            CustomSubject   = [string]$Request.Body.CustomSubject
+            Tenants           = [string]$TenantsJson
+            excludedTenants   = [string]$excludedTenantsJson
+            Conditions        = [string]$Conditions
+            Actions           = [string]$Actions
+            type              = $Request.Body.logbook.value
+            RowKey            = $RowKey
+            PartitionKey      = 'Webhookv2'
+            AlertComment      = [string]$Request.Body.AlertComment
+            CustomSubject     = [string]$Request.Body.CustomSubject
+            # The audit form posts the raw form values, so an autocomplete selection arrives as a
+            # {label, value} object - unwrap it to the bare Halo priority id before storing.
+            PsaTicketPriority = [string]($Request.Body.PsaTicketPriority.value ?? $Request.Body.PsaTicketPriority)
         }
         $WebhookTable = Get-CippTable -TableName 'WebhookRules'
+        if ($Request.Body.RowKey) {
+            # Editing replaces the entity, so carry the disabled state over to keep a disabled alert disabled
+            $ExistingAlert = Get-CIPPAzDataTableEntity @WebhookTable -Filter "RowKey eq '$RowKey'" -Property RowKey, Disabled
+            if ($ExistingAlert.Disabled -eq $true) {
+                $CompleteObject.Disabled = $true
+            }
+        }
         Add-CIPPAzDataTableEntity @WebhookTable -Entity $CompleteObject -Force
         $Results = "Added Audit Log Alert for $($Tenants.count) tenants. It may take up to four hours before Microsoft starts delivering these alerts."
         Write-LogMessage -API 'AddAlert' -message $Results -sev Info -LogData $CompleteObject -headers $Request.Headers

@@ -39,6 +39,7 @@ function Invoke-CIPPStandardSpamFilterPolicy {
             {"type":"autoComplete","required":true,"multiple":false,"creatable":true,"label":"High Confidence Spam Quarantine Tag","name":"standards.SpamFilterPolicy.HighConfidenceSpamQuarantineTag","options":[{"label":"AdminOnlyAccessPolicy","value":"AdminOnlyAccessPolicy"},{"label":"DefaultFullAccessPolicy","value":"DefaultFullAccessPolicy"},{"label":"DefaultFullAccessWithNotificationPolicy","value":"DefaultFullAccessWithNotificationPolicy"}]}
             {"type":"autoComplete","required":true,"multiple":false,"creatable":false,"label":"Bulk Spam Action","name":"standards.SpamFilterPolicy.BulkSpamAction","options":[{"label":"Quarantine the message","value":"Quarantine"},{"label":"Move message to Junk Email folder","value":"MoveToJmf"}]}
             {"type":"autoComplete","required":true,"multiple":false,"creatable":true,"label":"Bulk Quarantine Tag","name":"standards.SpamFilterPolicy.BulkQuarantineTag","options":[{"label":"AdminOnlyAccessPolicy","value":"AdminOnlyAccessPolicy"},{"label":"DefaultFullAccessPolicy","value":"DefaultFullAccessPolicy"},{"label":"DefaultFullAccessWithNotificationPolicy","value":"DefaultFullAccessWithNotificationPolicy"}]}
+            {"type":"autoComplete","required":false,"multiple":false,"creatable":false,"label":"Bulk moves enabled (deliver bulk mail below the threshold to the Promotions folder - Preview)","name":"standards.SpamFilterPolicy.BulkMovesEnabled","options":[{"label":"On","value":"On"},{"label":"Off","value":"Off"}]}
             {"type":"autoComplete","required":true,"multiple":false,"creatable":false,"label":"Phish Spam Action","name":"standards.SpamFilterPolicy.PhishSpamAction","options":[{"label":"Quarantine the message","value":"Quarantine"},{"label":"Move message to Junk Email folder","value":"MoveToJmf"}]}
             {"type":"autoComplete","required":true,"multiple":false,"creatable":true,"label":"Phish Quarantine Tag","name":"standards.SpamFilterPolicy.PhishQuarantineTag","options":[{"label":"AdminOnlyAccessPolicy","value":"AdminOnlyAccessPolicy"},{"label":"DefaultFullAccessPolicy","value":"DefaultFullAccessPolicy"},{"label":"DefaultFullAccessWithNotificationPolicy","value":"DefaultFullAccessWithNotificationPolicy"}]}
             {"type":"autoComplete","required":true,"multiple":false,"creatable":true,"label":"High Confidence Phish Quarantine Tag","name":"standards.SpamFilterPolicy.HighConfidencePhishQuarantineTag","options":[{"label":"AdminOnlyAccessPolicy","value":"AdminOnlyAccessPolicy"},{"label":"DefaultFullAccessPolicy","value":"DefaultFullAccessPolicy"},{"label":"DefaultFullAccessWithNotificationPolicy","value":"DefaultFullAccessWithNotificationPolicy"}]}
@@ -93,21 +94,32 @@ function Invoke-CIPPStandardSpamFilterPolicy {
         return
     }
 
-    # Only match against legacy/default names when no custom name is provided. When a custom name is
-    # set, deploy it as a new policy instead of reusing an existing default-named one. 'Default' is
-    # Microsoft's built-in inbound anti-spam policy ("Anti-spam inbound policy" in the portal); it
-    # cannot be renamed and has no associated rule.
-    if ($PolicyName -eq $DefaultPolicyName) {
-        $PolicyList = @($PolicyName, 'Default Spam Filter Policy', 'Default')
-        $ExistingPolicy = $AllSpamFilterPolicies | Where-Object -Property Name -In $PolicyList | Select-Object -First 1
-        if ($null -ne $ExistingPolicy.Name) {
-            # Use existing policy name if found
-            $PolicyName = $ExistingPolicy.Name
+    # Resolve which policy this standard manages. An exact name match always wins, so a tenant that
+    # already has a CIPP-created policy keeps using it. Otherwise, when the configured name is one of the
+    # aliases for Microsoft's built-in inbound anti-spam policy, adopt that built-in policy instead of
+    # creating a duplicate: Get-HostedContentFilterPolicy returns it named 'Default', while the Defender
+    # portal labels it "Anti-spam inbound policy" and older CIPP builds used "Default Spam Filter Policy".
+    # Customers targeting the built-in policy commonly enter any of these (the same rename workaround that
+    # works for the other Default* Defender standards, where the cmdlet name and portal name match). Any
+    # other value is a genuinely custom policy and is created as new.
+    $DefaultPolicyNames = @($DefaultPolicyName, 'Default Spam Filter Policy', 'Default', 'Anti-spam inbound policy')
+    $ExistingPolicy = $AllSpamFilterPolicies | Where-Object -Property Name -EQ $PolicyName | Select-Object -First 1
+    if ($null -eq $ExistingPolicy -and $PolicyName -in $DefaultPolicyNames) {
+        # No policy is literally named e.g. "Anti-spam inbound policy" - that is only the portal label.
+        # Fall back to the built-in default policy, identified by its IsDefault flag (or its 'Default'
+        # name if the flag is unavailable).
+        $ExistingPolicy = $AllSpamFilterPolicies | Where-Object { $_.IsDefault -eq $true } | Select-Object -First 1
+        if ($null -eq $ExistingPolicy) {
+            $ExistingPolicy = $AllSpamFilterPolicies | Where-Object -Property Name -EQ 'Default' | Select-Object -First 1
         }
+    }
+    if ($null -ne $ExistingPolicy.Name) {
+        # Adopt the existing policy's real name so state comparison and remediation target it.
+        $PolicyName = $ExistingPolicy.Name
     }
 
     # The built-in default policy cannot have a HostedContentFilterRule, so rule remediation is skipped for it.
-    $IsDefaultPolicy = $PolicyName -eq 'Default'
+    $IsDefaultPolicy = ($ExistingPolicy.IsDefault -eq $true) -or ($PolicyName -eq 'Default')
 
     $CurrentState = $AllSpamFilterPolicies | Where-Object -Property Name -EQ $PolicyName
 
@@ -120,6 +132,10 @@ function Invoke-CIPPStandardSpamFilterPolicy {
     $PhishSpamAction = $Settings.PhishSpamAction.value ?? $Settings.PhishSpamAction
     $PhishQuarantineTag = $Settings.PhishQuarantineTag.value ?? $Settings.PhishQuarantineTag
     $HighConfidencePhishQuarantineTag = $Settings.HighConfidencePhishQuarantineTag.value ?? $Settings.HighConfidencePhishQuarantineTag
+    # BulkMovesEnabled is in Preview and not available in every organization, so it is only
+    # compared and written when explicitly configured On or Off.
+    $BulkMovesEnabled = $Settings.BulkMovesEnabled.value ?? $Settings.BulkMovesEnabled
+    $BulkMovesConfigured = $BulkMovesEnabled -in @('On', 'Off')
 
     # Normalize list settings to clean string arrays. Values may arrive as a proper array or as a
     # single comma-delimited string; splitting and trimming makes Compare-Object and remediation reliable.
@@ -175,6 +191,7 @@ function Invoke-CIPPStandardSpamFilterPolicy {
         ($CurrentState.MarkAsSpamFromAddressAuthFail -eq 'Off') -and
         ($CurrentState.MarkAsSpamNdrBackscatter -eq 'Off') -and
         ($CurrentState.MarkAsSpamBulkMail -eq 'On') -and
+        ((-not $BulkMovesConfigured) -or ($CurrentState.BulkMovesEnabled -eq $BulkMovesEnabled)) -and
         ($CurrentState.InlineSafetyTipsEnabled -eq $true) -and
         ($CurrentState.PhishZapEnabled -eq $true) -and
         ($CurrentState.SpamZapEnabled -eq $true) -and
@@ -249,6 +266,9 @@ function Invoke-CIPPStandardSpamFilterPolicy {
                 $cmdParams.Add('RegionBlockList', $RegionBlockList)
             } else {
                 $cmdParams.Add('EnableRegionBlockList', $false)
+            }
+            if ($BulkMovesConfigured) {
+                $cmdParams.Add('BulkMovesEnabled', $BulkMovesEnabled)
             }
 
 
@@ -378,6 +398,10 @@ function Invoke-CIPPStandardSpamFilterPolicy {
         if ($Settings.EnableRegionBlockList) {
             $CurrentValue['RegionBlockList'] = $CurrentState.RegionBlockList
             $ExpectedValue['RegionBlockList'] = $RegionBlockList
+        }
+        if ($BulkMovesConfigured) {
+            $CurrentValue['BulkMovesEnabled'] = "$($CurrentState.BulkMovesEnabled)"
+            $ExpectedValue['BulkMovesEnabled'] = $BulkMovesEnabled
         }
 
         Set-CIPPStandardsCompareField -FieldName 'standards.SpamFilterPolicy' -CurrentValue $CurrentValue -ExpectedValue $ExpectedValue -Tenant $Tenant

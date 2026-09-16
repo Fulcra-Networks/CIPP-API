@@ -17,6 +17,7 @@ function Invoke-CIPPStandardTeamsFederationConfiguration {
             Configures how the organization federates with external organizations for Teams communication, controlling whether employees can communicate with specific external domains or all external organizations. This setting enables secure inter-organizational collaboration while maintaining control over external communications.
         ADDEDCOMPONENT
             {"type":"switch","name":"standards.TeamsFederationConfiguration.AllowTeamsConsumer","label":"Allow users to communicate with other organizations"}
+            {"type":"switch","name":"standards.TeamsFederationConfiguration.AllowTeamsConsumerInbound","label":"Allow unmanaged Teams users to initiate contact","condition":{"field":"standards.TeamsFederationConfiguration.AllowTeamsConsumer","compareType":"is","compareValue":true}}
             {"type":"autoComplete","required":true,"multiple":false,"creatable":false,"name":"standards.TeamsFederationConfiguration.DomainControl","label":"Communication Mode","options":[{"label":"Allow all external domains","value":"AllowAllExternal"},{"label":"Block all external domains","value":"BlockAllExternal"},{"label":"Allow specific external domains","value":"AllowSpecificExternal"},{"label":"Block specific external domains","value":"BlockSpecificExternal"}]}
             {"type":"textField","name":"standards.TeamsFederationConfiguration.DomainList","label":"Domains, Comma separated","required":false,"condition":{"field":"standards.TeamsFederationConfiguration.DomainControl.value","compareType":"isOneOf","compareValue":["AllowSpecificExternal","BlockSpecificExternal"]}}
         IMPACT
@@ -53,24 +54,29 @@ function Invoke-CIPPStandardTeamsFederationConfiguration {
         return
     }
 
-    # ConfigAPI (TenantFederationSettings) domain payload shapes:
-    #   Allow all external      -> AllowedDomains = @()                       (empty array)
-    #   Allow specific external -> AllowedDomains = @{ AllowList = @(list) }
-    #   Block specific external -> AllowedDomains = @{ AllowList = @() } + BlockedDomains = @(list)
+    # ConfigAPI (TenantFederationSettings) domain payload shapes are GET-symmetric:
+    #   Allow all external      -> AllowedDomains = @{}                       (empty OBJECT = AllowAllKnownDomains)
+    #   Allow specific external -> AllowedDomains = @{ AllowedDomain = @(@{ Domain = 'x' }) }
+    #   Block specific external -> AllowedDomains = @{} + BlockedDomains = @(@{ Domain = 'x' })
+    # NEVER send an empty ARRAY (or an AllowList envelope) for AllowedDomains: the ConfigAPI
+    # coerces it into an explicit EMPTY allow list ({"AllowedDomain":[]}) - federation with
+    # nobody - while the write reports success and the next read looks aligned. That flipped
+    # whole fleets to "Block all external domains" (CyberDrain/CIPP#364).
     $DomainControl = $Settings.DomainControl.value ?? $Settings.DomainControl
     # An untoggled switch is absent from the settings; default it to $false so we never send null to the ConfigApi
     $AllowTeamsConsumer = $Settings.AllowTeamsConsumer ?? $false
+    $AllowTeamsConsumerInbound = $Settings.AllowTeamsConsumerInbound ?? $false
     $AllowedDomainsAsAList = @()
     $BlockedDomains = @()
     switch ($DomainControl) {
         'AllowAllExternal' {
             $AllowFederatedUsers = $true
-            $AllowedDomainsPayload = @()
+            $AllowedDomainsPayload = @{}
             $ExpectedAllowAllKnown = $true
         }
         'BlockAllExternal' {
             $AllowFederatedUsers = $false
-            $AllowedDomainsPayload = @()
+            $AllowedDomainsPayload = @{}
             $ExpectedAllowAllKnown = $true
         }
         'AllowSpecificExternal' {
@@ -78,7 +84,7 @@ function Invoke-CIPPStandardTeamsFederationConfiguration {
             if ($null -ne $Settings.DomainList) {
                 $AllowedDomainsAsAList = @($Settings.DomainList).Split(',').Trim() | Sort-Object
             }
-            $AllowedDomainsPayload = @{ AllowList = @($AllowedDomainsAsAList) }
+            $AllowedDomainsPayload = @{ AllowedDomain = @($AllowedDomainsAsAList | ForEach-Object { @{ Domain = $_ } }) }
             $ExpectedAllowAllKnown = $false
         }
         'BlockSpecificExternal' {
@@ -86,7 +92,7 @@ function Invoke-CIPPStandardTeamsFederationConfiguration {
             if ($null -ne $Settings.DomainList) {
                 $BlockedDomains = @($Settings.DomainList).Split(',').Trim() | Sort-Object
             }
-            $AllowedDomainsPayload = @{ AllowList = @() }
+            $AllowedDomainsPayload = @{}
             $ExpectedAllowAllKnown = $true
         }
         default {
@@ -95,17 +101,19 @@ function Invoke-CIPPStandardTeamsFederationConfiguration {
         }
     }
 
-    # Parse current state (ConfigAPI TenantFederationSettings GET shape). NOTE the GET/PUT
-    # asymmetry: the GET nests the allow-list under AllowedDomains.AllowedDomain (allow-all =
-    # {} with no AllowedDomain), whereas the PUT expects AllowedDomains.AllowList / []. Items
-    # may be plain strings or objects with a .Domain property, so handle both.
+    # Parse current state (ConfigAPI TenantFederationSettings GET shape): allow-all reads as
+    # AllowedDomains = {} with NO AllowedDomain member; an explicit allow list nests items
+    # (plain strings or {Domain} objects) under AllowedDomains.AllowedDomain. An allow list
+    # that is PRESENT but EMPTY ({"AllowedDomain":[]}) is NOT allow-all - it federates with
+    # nobody (the #364 breakage state) - so key off the member's presence, not the item count,
+    # or broken tenants read as compliant forever.
     $CurrentAllowedDomains = @()
     $ad = $CurrentState.AllowedDomains
-    if ($ad -and ($ad.PSObject.Properties.Name -contains 'AllowedDomain') -and $ad.AllowedDomain) {
+    $HasExplicitAllowList = [bool]($ad -and ($ad.PSObject.Properties.Name -contains 'AllowedDomain'))
+    if ($HasExplicitAllowList -and $ad.AllowedDomain) {
         $CurrentAllowedDomains = @($ad.AllowedDomain | ForEach-Object { if ($_ -is [string]) { $_ } elseif ($_.Domain) { $_.Domain } else { "$_" } }) | Sort-Object
     }
-    # Allow-all-known = no explicit allow-list present (ConfigAPI returns {} for allow-all).
-    $IsCurrentAllowAllKnownDomains = ($CurrentAllowedDomains.Count -eq 0)
+    $IsCurrentAllowAllKnownDomains = -not $HasExplicitAllowList
     $CurrentBlockedDomains = @()
     if ($CurrentState.BlockedDomains) {
         $CurrentBlockedDomains = @($CurrentState.BlockedDomains | ForEach-Object { if ($_ -is [string]) { $_ } elseif ($_.Domain) { $_.Domain } else { "$_" } }) | Sort-Object
@@ -140,6 +148,7 @@ function Invoke-CIPPStandardTeamsFederationConfiguration {
     $ExpectedBlockedDomains = $BlockedDomains ?? @()
 
     $StateIsCorrect = ($CurrentState.AllowTeamsConsumer -eq $AllowTeamsConsumer) -and
+    ($CurrentState.AllowTeamsConsumerInbound -eq $AllowTeamsConsumerInbound) -and
     ($CurrentState.AllowFederatedUsers -eq $AllowFederatedUsers) -and
     $AllowedDomainsMatches -and
     $BlockedDomainsMatches
@@ -149,11 +158,12 @@ function Invoke-CIPPStandardTeamsFederationConfiguration {
             Write-LogMessage -API 'Standards' -tenant $Tenant -message 'Federation Configuration already set.' -sev Info
         } else {
             $cmdParams = @{
-                Identity            = 'Global'
-                AllowTeamsConsumer  = $AllowTeamsConsumer
-                AllowFederatedUsers = $AllowFederatedUsers
-                AllowedDomains      = $AllowedDomainsPayload
-                BlockedDomains      = @($BlockedDomains)
+                Identity                  = 'Global'
+                AllowTeamsConsumer        = $AllowTeamsConsumer
+                AllowTeamsConsumerInbound = $AllowTeamsConsumerInbound
+                AllowFederatedUsers       = $AllowFederatedUsers
+                AllowedDomains            = $AllowedDomainsPayload
+                BlockedDomains            = @($BlockedDomains | ForEach-Object { @{ Domain = $_ } })
             }
 
             try {
@@ -210,15 +220,17 @@ function Invoke-CIPPStandardTeamsFederationConfiguration {
         }
 
         $CurrentValue = @{
-            AllowTeamsConsumer  = $CurrentState.AllowTeamsConsumer
-            AllowFederatedUsers = $CurrentState.AllowFederatedUsers
+            AllowTeamsConsumer         = $CurrentState.AllowTeamsConsumer
+            AllowTeamsConsumerInbound = $CurrentState.AllowTeamsConsumerInbound
+            AllowFederatedUsers       = $CurrentState.AllowFederatedUsers
             AllowedDomains      = $CurrentAllowedDomainsForReport
             BlockedDomains      = $CurrentBlockedDomainsForReport
         }
         $ExpectedValue = @{
-            AllowTeamsConsumer  = $AllowTeamsConsumer
-            AllowFederatedUsers = $AllowFederatedUsers
-            AllowedDomains      = $ExpectedAllowedDomainsForReport
+            AllowTeamsConsumer         = $AllowTeamsConsumer
+            AllowTeamsConsumerInbound = $AllowTeamsConsumerInbound
+            AllowFederatedUsers       = $AllowFederatedUsers
+            AllowedDomains            = $ExpectedAllowedDomainsForReport
             BlockedDomains      = $ExpectedBlockedDomainsForReport
         }
         Set-CIPPStandardsCompareField -FieldName 'standards.TeamsFederationConfiguration' -CurrentValue $CurrentValue -ExpectedValue $ExpectedValue -Tenant $Tenant

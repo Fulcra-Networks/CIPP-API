@@ -136,8 +136,29 @@ function Invoke-ListTenants {
                 $Body = $Tenants
             }
             if ($Request.Query.Mode -eq 'TenantList') {
-                # add portal link properties
-                $Body = $Body | Select-Object *, @{Name = 'portal_m365'; Expression = { "https://admin.cloud.microsoft/?delegatedOrg=$($_.initialDomainName)" } },
+                # Get-TenantGroups is cached and already scoped to the groups the caller may see.
+                $GroupsByCustomerId = @{}
+                try {
+                    foreach ($Group in @(Get-TenantGroups)) {
+                        foreach ($Member in @($Group.Members)) {
+                            if (!$Member.customerId) { continue }
+                            if (-not $GroupsByCustomerId.ContainsKey($Member.customerId)) {
+                                $GroupsByCustomerId[$Member.customerId] = [System.Collections.Generic.List[object]]::new()
+                            }
+                            $GroupsByCustomerId[$Member.customerId].Add([PSCustomObject]@{
+                                    Name      = $Group.Name
+                                    GroupType = $Group.GroupType
+                                })
+                        }
+                    }
+                } catch {
+                    Write-LogMessage -headers $Headers -API $APIName -message "Failed to retrieve tenant groups for the tenant list. The error is: $($_.Exception.Message)" -Sev 'Warning'
+                }
+
+                # add portal link properties. The unary comma on tenantGroups is required:
+                # Select-Object unrolls calculated property values.
+                $Body = $Body | Select-Object *, @{Name = 'tenantGroups'; Expression = { , @($GroupsByCustomerId[$_.customerId] | Sort-Object -Property Name) } },
+                @{Name = 'portal_m365'; Expression = { "https://admin.cloud.microsoft/?delegatedOrg=$($_.initialDomainName)" } },
                 @{Name = 'portal_exchange'; Expression = { "https://admin.cloud.microsoft/exchange?delegatedOrg=$($_.initialDomainName)" } },
                 @{Name = 'portal_entra'; Expression = { "https://entra.microsoft.com/$($_.defaultDomainName)" } },
                 @{Name = 'portal_teams'; Expression = { "https://admin.teams.microsoft.com?delegatedOrg=$($_.initialDomainName)" } },
@@ -150,7 +171,16 @@ function Invoke-ListTenants {
                         # tenant - it has to be resolved through Graph. Hand out the cached URL when we
                         # have one so the link behaves like every other portal, and fall back to the
                         # endpoint that resolves (and caches) it on first use.
-                        if ($_.SharepointAdminUrl) { $_.SharepointAdminUrl } else { "/api/ListSharePointAdminUrl?tenantFilter=$($_.defaultDomainName)" }
+                        #
+                        # A cached URL whose TLD does not match the tenant's own was stored before
+                        # sovereign clouds were handled (a .com link for a sharepoint.de tenant,
+                        # issue #269). Send those back through the resolver, which overwrites the row.
+                        $CachedAdminUrl = $_.SharepointAdminUrl
+                        if ($CachedAdminUrl -and $_.initialDomainName) {
+                            $ExpectedTld = (Get-CIPPSharePointDomain -TenantDomain $_.initialDomainName) -split '\.' | Select-Object -Last 1
+                            if ((([uri]$CachedAdminUrl).Host -split '\.' | Select-Object -Last 1) -ne $ExpectedTld) { $CachedAdminUrl = $null }
+                        }
+                        if ($CachedAdminUrl) { $CachedAdminUrl } else { "/api/ListSharePointAdminUrl?tenantFilter=$($_.defaultDomainName)" }
                     }
                 },
                 @{Name = 'portal_platform'; Expression = { "https://admin.powerplatform.microsoft.com/account/login/$($_.customerId)" } },

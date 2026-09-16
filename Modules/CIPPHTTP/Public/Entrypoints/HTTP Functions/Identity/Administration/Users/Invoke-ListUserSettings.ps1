@@ -56,15 +56,11 @@ function Invoke-ListUserSettings {
 
         if (!$UserSettings) {
             $UserSettings = [pscustomobject]@{
-                direction      = 'ltr'
-                paletteMode    = 'light'
-                currentTheme   = @{ value = 'light'; label = 'light' }
-                pinNav         = $true
-                showDevtools   = $false
-                customBranding = @{
-                    colour = '#F77F00'
-                    logo   = $null
-                }
+                direction    = 'ltr'
+                paletteMode  = 'light'
+                currentTheme = @{ value = 'light'; label = 'light' }
+                pinNav       = $true
+                showDevtools = $false
             }
         }
 
@@ -76,6 +72,9 @@ function Invoke-ListUserSettings {
             if (-not $Offboarding) { return $false }
             foreach ($Property in $Offboarding.PSObject.Properties) {
                 if ($Property.Value -eq $true) { return $true }
+                if ($Property.Name -eq 'OOO' -and -not (Test-CIPPHtmlIsEmpty -Html ([string]$Property.Value))) {
+                    return $true
+                }
             }
             return $false
         }
@@ -101,16 +100,8 @@ function Invoke-ListUserSettings {
             Write-Warning "Failed to convert UserBookmarks JSON: $($_.Exception.Message)"
         }
 
-        #Get branding settings
-        if ($UserSettings) {
-            $brandingTable = Get-CippTable -tablename 'Config'
-            # Partition-scoped, not RowKey-scoped: a logo over the 1 MiB entity limit is split across
-            # 'BrandingSettings-partN' rows and reassembly needs all of them in the result set.
-            $BrandingSettings = Get-CIPPAzDataTableEntity @brandingTable -Filter "PartitionKey eq 'BrandingSettings'" | Where-Object { $_.RowKey -eq 'BrandingSettings' }
-            if ($BrandingSettings) {
-                $UserSettings | Add-Member -MemberType NoteProperty -Name 'customBranding' -Value $BrandingSettings -Force | Out-Null
-            }
-        }
+        # Branding is served by Invoke-ListBrandingSettings, not from here: it carries inline
+        # images and its migration writes, neither of which belong on every page load.
 
         if ($UserSpecificSettings) {
             $UserSettings | Add-Member -MemberType NoteProperty -Name 'UserSpecificSettings' -Value $UserSpecificSettings -Force | Out-Null
