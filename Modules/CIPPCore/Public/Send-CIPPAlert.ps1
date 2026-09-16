@@ -420,3 +420,4 @@ function Send-CIPPAlert {
             }
         }
     }
+}
