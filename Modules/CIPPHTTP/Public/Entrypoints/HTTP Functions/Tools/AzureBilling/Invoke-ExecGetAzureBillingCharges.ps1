@@ -517,31 +517,68 @@ function GetAzureConsumptionMonthSplit {
     )
 
     try {
-        $uriSuffix = "/index.php/api/consumption/license/$($License)/monthlySplit/?group_by=$($GroupBy)&billingMonthStart=$($MonthStart)&billingMonthEnd=$($MonthEnd)"
+        # DEPRECATED Endpoint - Removed 2026-09-30
+        #$uriSuffix = "/index.php/api/consumption/license/$($License)/monthlySplit/?group_by=$($GroupBy)&billingMonthStart=$($MonthStart)&billingMonthEnd=$($MonthEnd)"
+
+        # Line V2 is a single-period and paginated, no server-side group by.
+        # Fetch every page. Aggregate client-side.
+        # Deprecated 2025-07-31 and retiring 2026-12-31
+        # See "Consumption Detail V2" https://arrowsphere-api.readme.io/reference/requestconsumptiondetailv2
+        $lines = Get-ArrowConsumptionLines -License $License -Period $MonthStart -hdrAuth $hdrAuth
 
         $azMonth = [azConsumptionMonthSplit]::new()
         $azMonth.groupBy = $GroupBy
-        $resp = Invoke-RestMethod -Uri ($baseURI + $uriSuffix) -Method "GET" `
-            -ContentType "application/json" `
-            -Headers $hdrAuth
 
-        $i = 0
-        foreach ($line in $resp.data.list.dataProvider) {
+        if($lines.Count -eq 0) {
+            $azMonth.lines = @()
+            return $azMonth
+        }
+
+        $groupColumn = switch($GroupBy.ToLower()){
+            'resource group' { 'Resource Group' }
+            default { throw "Unsupported GroupBy '$GroupBy' for Line V2"}
+        }
+
+        $groups = [ordered]@{}
+        foreach($line in $lines){
+            $groupName = "$($line.$groupColumn)".Trim()
+            # Old endpoint reported ungrouped consumption as "N/A";
+            # Write-ChargesToTable already normalizes that to "NA" for RowKey.
+            if([string]::IsNullOrWhiteSpace(($groupName)) -or $groupName -eq 'null'){
+                $groupName = 'N/A'
+            }
+
+            if(-not $groups.Contains($groupName)){
+                $groups[$groupName] = @{ sell = [decimal]0; buy = [decimal]0; currency = $line.'Country currency code' }
+            }
+            $groups[$groupName].sell += ConvertTo-ArrowDecimal $line.'Total sell price'
+            $groups[$groupName].buy += ConvertTo-ArrowDecimal $line.'Total buy price'
+        }
+
+        $azLines = [System.Collections.Generic.List[azConsumptionMonthSplitLines]]::new()
+        foreach($groupName in $groups.Keys){
+            $g = $groups[$groupName]
             $azLine = [azConsumptionMonthSplitLines]::new()
             $azLine.customer = $Customer.CompanyName
             $azLine.customerRef = $Customer.Reference
             $azLine.month = $MonthStart
             $azLine.licenseRef = $Subscription.license_id
-            $azLine.currency = $resp.data.list.currency
-            $azLine.totalCustomer = $resp.data.customer.dataProvider[$($i)].consumption
-            $azLine.totalList = $resp.data.list.dataProvider[$($i)].consumption
-            $azLine.totalReseller = $resp.data.reseller.dataProvider[$($i)].consumption
-            $azLine.group = $resp.data.list.dataProvider[$($i)].group_by
-            $azMonth.lines += $azLine
-            $i++
+            $azLine.currency = $g.currency
+            $azLine.group = $groupName
+            # Price tier mapping (old -> Line V2):
+            #   customer.consumption -> Total sell price
+            #   reseller.consumption -> Total buy price
+            #   list.consumption     -> NO EQUIVALENT in V2. Get-MappedUnmappedCharges prices the
+            #                           customer off totalList and applies mapping.markup on top.
+            #                           Aliased to sell price pending the business decision recorded
+            #                           in the migration plan (Phase 2, totalList).
+            $azLine.totalCustomer = $g.sell
+            $azLine.totalReseller = $g.buy
+            $azLine.totalList = $g.sell
+            $azLines.Add($azLine)
         }
 
-
+        $azMonth.lines = $azLines.ToArray()
         return $azMonth
     }
     catch {
@@ -594,6 +631,45 @@ function ConvertFrom-ArrowHeadersLines {
         }
         [PSCustomObject]$obj
     }
+}
+
+function Get-ArrowConsumptionLines {
+    param(
+        [string]$License,
+        [string]$Period,
+        [int]$PerPage = 2000, # This is the max the API provides
+        [int]$MaxPages = 500, # API limit to 1m rows.
+        [Parameter(Mandatory = $true)]$hdrAuth
+    )
+
+    $all = [System.Collections.Generic.List[object]]::new()
+    $page = 1
+
+    do {
+        $uriSuffix = "/index.php/api/consumption/line/license/$($License)/$($Period)?page=$($page)&perPage=$($PerPage)"
+        $resp = Invoke-RestMethod -Uri ($baseURI + $uriSuffix) -Method "GET" `
+            -ContentType "application/json" `
+            -Headers $hdrAuth
+
+        $pageLines = @(ConvertFrom-ArrowHeadersLines -data $resp.data)
+        foreach($l in $pageLines) { $all.Add($l) }
+        $page++
+    }
+    while ($pageLines.Count -eq $PerPage -and $page -le $MaxPages)
+
+    if($page -gt $MaxPages){
+        Write-LogMessage -sev Warning -API 'Azure Billing' -message "Line V2 for $License & $Period hit $MaxPages page cap. Consumption may be truncated"
+    }
+    return $all
+}
+
+function ConvertTo-ArrowDecimal {
+    param($Value)
+
+    if($null -eq $Value -or "$Value" -eq 'null' -or "$Value" -eq '') { return [decimal]0 }
+    $d = $Value -as [decimal]
+    if($null -eq $d){ return [decimal]0 }
+    return $d
 }
 
 function Test-ArrowMonthlyConsumptionValid {
