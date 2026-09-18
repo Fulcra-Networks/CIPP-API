@@ -169,7 +169,6 @@ function Get-ChargesWereSent {
     return ($null -ne $results)
 }
 
-
 #This will return a row indicating a subscription had no data.
 function Get-NoDataRow {
     param($customer, $subscription, $dateval)
@@ -352,8 +351,6 @@ function Write-ChargesToTable {
     }
 }
 
-
-
 function Write-UnmappedToTable {
     param($table, $unmappedcharges)
 
@@ -468,7 +465,10 @@ function GetCustLicenses {
 
     )
 
-    $uriSuffix = "/index.php/api/customers/$custId/licenses?state=$state"
+    # DEPRECATED Endpoint - Order {} data removed
+    #    $uriSuffix = "/index.php/api/customers/$custId/licenses?state=$state"
+    # New Customer endpoint - Offers ?state param for license active state.
+    $uriSuffix = "/index.php/api/customers/v2/$custId/licenses?state=$state"
 
     if ($sku -ne "") {
         $uriSuffix += "&sku=$sku"
