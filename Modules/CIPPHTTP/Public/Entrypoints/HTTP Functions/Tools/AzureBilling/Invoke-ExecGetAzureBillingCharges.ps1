@@ -109,13 +109,18 @@ function Invoke-ExecGetAzureBillingCharges {
             foreach ($sub in $subscriptions) {
                 try {
                     $conMonth = GetConsumptionMonthly -License $sub.license_id -hdrAuth $hdrAuth -MonthStart $monthFilter -MonthEnd $monthFilter
+                    # 2026-09-18 - MonthlyV2 does not have "status" field. Reconstruct the old 'consumed_valid' gate:
+                    # a closed report period with a numeric sell total.
+                    $validity = Test-ArrowMonthlyConsumptionValid -Response $conMonth -ReportPeriod $monthFilter
 
-                    if ($conMonth.data.list.dataProvider.status -match 'consumed_valid') {
+                    # if ($conMonth.data.list.dataProvider.status -match 'consumed_valid') {
+                    if($validity.IsValid) {
                         $azMonthSplit = GetAzureConsumptionMonthSplit -License $sub.license_id -Subscription $sub -Customer $cust -GroupBy "resource group" -hdrAuth $hdrAuth -MonthStart $monthFilter -MonthEnd $monthFilter
                         #Write-ChargesToTable -table $billingContext -charges $azMonthSplit -rerun $Request.Query.rerunJob
                         $allCharges.Add($azMonthSplit)
                     }
-                    elseif ($null -eq $conMonth -and $null -ne $sub) {
+                    else { #if ($null -eq $conMonth -and $null -ne $sub) {
+                        Write-LogMessage -sev Warning -API 'Azure Billing' -message "No valid consumption for $($sub.license_id) ($($cust.CompanyName)) in $($monthFilter): $($validity.Reason)"
                         #construct a 'no charges on sub data' object
                         $no_data_rows.Add((Get-NoDataRow -customer $cust -subscription $sub -dateval $monthFilter))
                     }
@@ -173,7 +178,7 @@ function Get-NoDataRow {
         customerId        = $customer.Reference
         customer          = $customer.companyName
         subscriptionId    = $subscription.license_id
-        "ResourceGroup"  = "NO DATA FROM ARROW"
+        "ResourceGroup"   = "NO DATA FROM ARROW"
         price             = 0.0
         cost              = 0.0
         vendor            = "Arrow"
@@ -282,7 +287,7 @@ function Write-NoDataRows {
                 chargeDate        = $line.chargeDate
                 customerId        = $line.customerId
                 customer          = $line.customer
-                "ResourceGroup"  = "NO DATA FROM ARROW"
+                "ResourceGroup"   = "NO DATA FROM ARROW"
                 price             = 0.0
                 cost              = 0.0
                 vendor            = "Arrow"
@@ -485,7 +490,9 @@ function GetConsumptionMonthly {
     )
 
     try {
-        $uriSuffix = "/index.php/api/consumption/license/$($License)/monthly/?billingMonthStart=$($MonthStart)&billingMonthEnd=$($MonthEnd)"
+        # DEPRECATED ENDPOINT
+        # $uriSuffix = "/index.php/api/consumption/license/$($License)/monthly/?billingMonthStart=$($MonthStart)&billingMonthEnd=$($MonthEnd)"
+        $uriSuffix = "/index.php/api/consumption/monthly/license/$($License)?reportPeriodStart=$($MonthStart)&reportPeriodEnd=$($MonthEnd)"
         $resp = Invoke-RestMethod -Uri ($baseURI + $uriSuffix) -Method "GET" `
             -ContentType "application/json" `
             -Headers $hdrAuth
@@ -569,6 +576,49 @@ function Get-PreviousMonthSentAmount {
         Write-LogMessage -sev Error -API 'Azure Billing' -message "Error in Get-PreviousMonthSentAmount: $($_.Exception.Message)"
         return $sentAmount;
     }
+}
+
+function ConvertFrom-ArrowHeadersLines {
+    param($data)
+
+    if (-not $data.headers -or -not $data.lines) {
+        Write-Host "ConvertFrom-ArrowHeadersLines did not receive a data.headers[]; data.lines[] object"
+        return @()
+    }
+
+    $headers = @($data.headers)
+    foreach($line in $data.lines){
+        $obj = [ordered]@{}
+        for($i = 0; $i -lt $headers.Count; $i++){
+            $obj[$headers[$i]] = $line[$i]
+        }
+        [PSCustomObject]$obj
+    }
+}
+
+function Test-ArrowMonthlyConsumptionValid {
+    param(
+        $Response,
+        [string]$ReportPeriod
+    )
+
+    if($null -eq $Response){
+        return @{ IsValid = $false; Reason = 'No response from Arrow' }
+    }
+
+    $lines = ConvertFrom-ArrowHeadersLines -Data $Response.data
+    $line = $lines | Where-Object { $_.'Report Period' -eq $ReportPeriod } | Select-Object -First 1
+
+    if($null -eq $line){
+        return @{ IsValid = $false; Reason = "No line for report period $ReportPeriod" }
+    }
+
+    # 'null' string means arrow couldn't aggregate the value consistently for the period...
+    $sell = $line.'Total sell price'
+    if($null -eq $sell -or "$sell" -eq 'null' -or $null -eq ($sell -as [decimal])){
+        return @{ IsValid = $false; Reason = "Total sell price is null/non-numeric"; Line = $line }
+    }
+    return @{ IsValid = $true; Reason = 'ok'; Line = $line }
 }
 
 class consumptionMonthLine {
