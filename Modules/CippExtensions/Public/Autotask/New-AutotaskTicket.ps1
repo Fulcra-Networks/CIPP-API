@@ -14,13 +14,25 @@ function New-AutotaskTicket {
     try{
         Get-AutotaskToken -configuration $Configuration.Autotask | Out-Null
 
-        if($description -match "</table>"){
+        # Autotask ticket descriptions are plain text. Strip markup whenever the body looks
+        # like HTML - the previous '</table>' check missed standards bodies that only use
+        # <p>/<li> (no compare table), so raw tags landed in the ticket.
+        if($description -match '<[a-zA-Z][^>]*>'){
             $description = $description `
                 -replace '<!--\[if[\s\S]*?<!\[endif\]-->', '' `
                 -replace '<style[\s\S]*?<\/style>', '' `
                 -replace '<[^>]+>', ''
             $description = $description.trim()
         }
+
+        # Tickets.description is a string(8000) per the AT REST field metadata; the API
+        # rejects the whole create if we exceed it. Title is string(255).
+        $MaxDescription = 8000
+        if ("$description".Length -gt $MaxDescription) {
+            $Suffix = "`n...[truncated $("$description".Length - $MaxDescription) chars - see CIPP for full details]"
+            $description = "$description".Substring(0, $MaxDescription - $Suffix.Length) + $Suffix
+        }
+        if ("$title".Length -gt 255) { $title = "$title".Substring(0, 251)+"..." }
 
         Write-LogMessage -api 'Autotask' -tenant 'None' -message "Creating ticket with parameters: $atCompanyId,$title,$estHr,$issueType,$subIssueType,$ticketType,$priority" -Sev Info
 

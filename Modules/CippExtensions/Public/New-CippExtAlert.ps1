@@ -25,7 +25,10 @@ function New-CippExtAlert {
                         $AlertText = $Alert.AlertText
                     }
 
-                    Write-LogMessage -API 'Webhook Alerts' -tenant $TenantFilter -message "Create AT Ticket for map: $MappedId, Tenant: $TenantId - Title: $($Alert.AlertTitle) - Text: $($AlertText)" -sev info
+                    # Don't put the whole ticket body in the Logs table - the HTML variant is
+                    # several KB per alert. Log size + format instead. Also $TenantFilter was
+                    # never defined in this scope; use the alert's tenant.
+                    Write-LogMessage -API 'Webhook Alerts' -tenant $Alert.TenantId -message "Create AT Ticket for map: $MappedId, Tenant: $TenantId - Title: $($Alert.AlertTitle) - Body: $("$AlertText".Length) chars ($(if ($Alert.AlertJSON) { 'json' } else { 'html' }))" -sev info
 
                     New-AutotaskTicket `
                         -Title $Alert.AlertTitle `

@@ -144,19 +144,35 @@ function Push-SchedulerCIPPNotifications {
                 $tenant = $g.Name
                 $Data = $g.Group | Select-Object Message, API, Tenant, Username, Severity
                 $HTMLContent = New-CIPPAlertTemplate -Data $Data -Format 'psa' -InputObject 'table' -CIPPURL $CIPPURL
+                $JSONContent = $Data | ConvertTo-Json -Depth 5 -Compress
                 $Title = "$tenant CIPP Alert: Alerts found starting at $((Get-Date).AddMinutes(-15))"
-                Send-CIPPAlert -Type 'psa' -Title $Title -HTMLContent $HTMLContent.htmlcontent -TenantFilter $tenant -APIName 'Alerts'
+                Send-CIPPAlert -Type 'psa' -Title $Title -HTMLContent $HTMLContent.htmlcontent -JSONContent $JSONContent -TenantFilter $tenant -APIName 'Alerts'
                 & $MarkSent $g.Group $LogTable
-                $Data = $null; $HTMLContent = $null
+                $Data = $null; $HTMLContent = $null; $JSONContent = $null
             }
             foreach ($g in $StandardsByTenant) {
                 $tenant = $g.Name
                 $Data = $g.Group
                 $Subject = "$($tenant): Standards are out of sync for $tenant"
                 $HTMLContent = New-CIPPAlertTemplate -Data $Data -Format 'psa' -InputObject 'standards' -CIPPURL $CIPPURL
-                Send-CIPPAlert -Type 'psa' -Title $Subject -HTMLContent $HTMLContent.htmlcontent -TenantFilter $tenant -APIName 'Alerts'
+                $StandardsSummary = foreach ($row in $Data) {
+                    $Differences = $null
+                    if ($row.object) {
+                        try {
+                            $Obj = $row.object | ConvertFrom-Json -ErrorAction Stop
+                            $Differences = if ($Obj.compare) { $Obj.compare } else { $Obj | Select-Object * -ExcludeProperty Etag, PartitionKey, TimeStamp }
+                        } catch { $Differences = $row.object }
+                    }
+                    [pscustomobject]@{
+                        standard    = $row.standardName
+                        message     = $row.message
+                        differences = $Differences
+                    }
+                }
+                $JSONContent = @($StandardsSummary) | ConvertTo-Json -Depth 10
+                Send-CIPPAlert -Type 'psa' -Title $Subject -HTMLContent $HTMLContent.htmlcontent -JSONContent $JSONContent -TenantFilter $tenant -APIName 'Alerts'
                 & $MarkSent $g.Group $StandardsTable
-                $Data = $null; $HTMLContent = $null
+                $Data = $null; $HTMLContent = $null; $JSONContent = $null; $StandardsSummary = $null
             }
         } catch {
             Write-Information "Could not send alerts to ticketing system: $($_.Exception.message)"
