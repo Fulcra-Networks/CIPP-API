@@ -132,15 +132,18 @@ function Get-MappedChargesToSend {
         if ($atMappingHashTable.Contains($join)) {
             $mapping = $atMappingHashTable[$join]
 
-            #if($mapping.billableToAccount){
-            #}
+            $price = $_.totalList
+            if($mapping.markup){
+                $price += ($price * $mapping.markup)
+            }
+
             $body += @{
                 chargeDate        = $chargeDate
                 customerId        = $_.customerRef
                 customer          = $_.customer
                 subscriptionId    = $_.licenseRef
                 "Resource Group"  = ($_.group.toupper())
-                price             = $_.totalList
+                price             = $price
                 cost              = $_.totalReseller
                 vendor            = "Arrow" # TODO - Set this via the billing extension config options.
                 atCustId          = $mapping.atCustId
